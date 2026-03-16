@@ -40,8 +40,13 @@
         <span class="filter-label">Data Source</span>
         <div class="filter-source on"><div class="source-dot" style="background:#0ea5e9"></div>Apollo.io<span style="margin-left:auto;font-size:10px;color:var(--green)">Live</span></div>
       </div>
-      <div class="filter-group"><span class="filter-label">Apollo List</span><select class="filter-select" id="f-list"><option value="">Loading lists...</option></select></div>
-      <div class="filter-group"><span class="filter-label">Apollo List</span><select class="filter-select" id="f-list"><option value="">— No list filter —</option></select></div><div class="filter-group">
+      <div class="filter-group">
+        <span class="filter-label">Apollo List</span>
+        <select class="filter-select" id="f-list">
+          <option value="">Loading lists...</option>
+        </select>
+      </div>
+      <div class="filter-group">
         <span class="filter-label">Job Titles - press Enter to add</span>
         <div class="titles-box" id="titles-box">
           <span id="titles-tags"></span>
@@ -78,10 +83,17 @@
           <option value="Legal">Legal</option>
         </select>
       </div>
-      <div class="filter-group"><span class="filter-label">Location</span><input class="filter-input" id="f-location" value="Denver, Colorado"/></div>
+      <div class="filter-group">
+        <span class="filter-label">Location</span>
+        <input class="filter-input" id="f-location" value="Denver, Colorado"/>
+      </div>
       <div class="filter-group">
         <span class="filter-label">Results per page</span>
-        <select class="filter-select" id="f-perpage"><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option></select>
+        <select class="filter-select" id="f-perpage">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
       </div>
       <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="runSearch(1)">Search Apollo Live</button>
     </div>
@@ -89,61 +101,23 @@
       <div id="leads-error"></div>
       <div class="leads-toolbar">
         <div class="leads-count">Showing <span id="leads-shown">0</span> of <span id="leads-total">0</span> leads</div>
-        <div class="search-wrap"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35" stroke-linecap="round"/></svg><input placeholder="Filter results..." oninput="filterTable(this.value)"/></div>
+        <div class="search-wrap">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35" stroke-linecap="round"/></svg>
+          <input placeholder="Filter results..." oninput="filterTable(this.value)"/>
+        </div>
         <button class="btn btn-primary btn-sm" onclick="bulkAdd()">+ Bulk Add Selected</button>
         <button class="btn btn-ghost btn-sm" onclick="bulkIgnore()">Ignore Selected</button>
       </div>
-      <div class="leads-table-wrap"><table class="leads-table"><thead><tr><th><input type="checkbox" onclick="selectAll(this)"/></th><th>Name</th><th>Company</th><th>Size</th><th>Location</th><th>Email</th><th>Actions</th></tr></thead><tbody id="leads-tbody"><tr><td colspan="7"><div class="loading-bar">Click Search Apollo Live to fetch real leads</div></td></tr></tbody></table></div>
+      <div class="leads-table-wrap">
+        <table class="leads-table">
+          <thead><tr><th><input type="checkbox" onclick="selectAll(this)"/></th><th>Name</th><th>Company</th><th>Size</th><th>Location</th><th>Email</th><th>Actions</th></tr></thead>
+          <tbody id="leads-tbody"><tr><td colspan="7"><div class="loading-bar">Click Search Apollo Live to fetch real leads</div></td></tr></tbody>
+        </table>
+      </div>
       <div class="pagination" id="pagination"></div>
     </div>
   </div>
 </div>
 
 <div class="page" id="page-prospects">
-  <div class="prospect-layout">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div><div class="section-eyebrow">Pipeline</div><div class="section-title">Prospect Manager</div></div>
-      <div style="display:flex;gap:8px"><select class="filter-select" style="width:auto;padding:6px 12px;font-size:13px" onchange="filterProspects(this.value)"><option value="">All Stages</option><option>New</option><option>Researching</option><option>Messaged</option><option>Replied</option></select><button class="btn btn-primary btn-sm" onclick="showPage('research')">Run AI Research</button></div>
-    </div>
-    <div class="prospect-grid" id="prospect-grid"></div>
-  </div>
-</div>
-
-<div class="page" id="page-research">
-  <div class="research-layout">
-    <div class="r-list"><div style="padding:14px 0 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text2)">Research Queue</div><div id="r-list-items"></div><button class="btn btn-primary btn-sm" style="width:100%;margin-top:12px" onclick="runAllResearch()">Research All</button></div>
-    <div class="r-pane" id="r-pane"><div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--text2)">Select a prospect to run AI research</div></div>
-  </div>
-</div>
-
-<div class="page" id="page-outreach">
-  <div class="outreach-layout">
-    <div class="o-list"><div class="o-list-hdr">Outreach Queue (<span id="o-count">0</span>)</div><div id="o-items"></div></div>
-    <div class="o-pane" id="o-pane"><div style="color:var(--text2);font-size:14px;text-align:center;padding:40px">Select a prospect to compose outreach</div></div>
-  </div>
-</div>
-
-<div class="page" id="page-settings">
-  <div class="settings-layout">
-    <div class="section-eyebrow">Configuration</div><div class="section-title">Settings and Integrations</div>
-    <div class="s-card"><div class="s-card-hdr">Apollo Integration</div><div class="s-card-body">
-      <div class="s-row"><div class="s-label">Proxy URL<div class="s-sub">Cloudflare Worker</div></div><input class="s-input" value="https://apollo-proxy.jason-939.workers.dev"/><div class="conn-status"><div class="conn-dot ok"></div>Live</div></div>
-      <div class="s-row"><div class="s-label">Apollo API Key<div class="s-sub">Stored in Cloudflare</div></div><input class="s-input" type="password" value="stored-securely"/><div class="conn-status"><div class="conn-dot ok"></div>Connected</div></div>
-    </div></div>
-    <div class="s-card"><div class="s-card-hdr">LinkedIn Integration</div><div class="s-card-body">
-      <div class="s-row"><div class="s-label">LinkedIn Account<div class="s-sub">Cross-referencing and drafting</div></div><div class="conn-status" style="margin-left:auto"><div class="conn-dot ok"></div>Authenticated</div><button class="btn btn-ghost btn-sm">Re-auth</button></div>
-      <div class="s-row"><div class="s-label">Auto-open LinkedIn on send</div><div class="toggle on" onclick="toggleEl(this)"></div></div>
-    </div></div>
-    <div class="s-card"><div class="s-card-hdr">Office 365 / Email</div><div class="s-card-body">
-      <div class="s-row"><div class="s-label">Microsoft 365<div class="s-sub">Follow-up email sequences</div></div><div class="conn-status" style="margin-left:auto"><div class="conn-dot ok"></div>Connected</div></div>
-      <div class="s-row"><div class="s-label">Sender Name</div><input class="s-input" value="Jason - Workplace IT"/></div>
-      <div class="s-row"><div class="s-label">Reply-to Email</div><input class="s-input" value="jason@workplaceit.net"/></div>
-    </div></div>
-    <button class="btn btn-primary" style="margin-top:8px" onclick="toast('Settings saved')">Save Settings</button>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
-<script src="app2.js"></script>
-</body>
-</html>
+  <div class=

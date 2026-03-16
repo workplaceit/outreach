@@ -58,7 +58,11 @@ async function loadApolloLists(){
       opt.textContent = l.name + " (" + (l.cached_count||0).toLocaleString() + ")";
       sel.appendChild(opt);
     });
+    if(!arr.length){
+      sel.innerHTML = '<option value="">No lists found</option>';
+    }
   } catch(e) {
+    sel.innerHTML = '<option value="">Error loading lists</option>';
     console.log("Lists error:", e.message);
   }
 }
