@@ -1,378 +1,74 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>SDR Pro</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{--navy:#0a1628;--cyan:#29abe2;--cyan2:#1da8cc;--cyan-light:#e8f7fd;--cyan-pale:#cceef9;--gray:#f5f7fa;--gray2:#e8ecf1;--gray3:#b0bbc8;--text:#1a2740;--text2:#4a5a72;--green:#22c55e;--red:#ef4444}
-body{font-family:Segoe UI,system-ui,sans-serif;background:var(--gray);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
-.topbar{background:var(--navy);color:#a0b4cc;font-size:12px;padding:7px 24px;display:flex;gap:24px;align-items:center}
-nav{background:#fff;border-bottom:1px solid var(--gray2);display:flex;align-items:center;padding:0 24px;height:60px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.06)}
-.logo{font-size:22px;font-weight:800;letter-spacing:-1px;color:var(--navy);margin-right:32px}.logo span{color:var(--cyan)}
-.nav-tabs{display:flex;height:100%;gap:2px;flex:1}
-.nav-tab{display:flex;align-items:center;gap:7px;padding:0 16px;font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;border-bottom:3px solid transparent;transition:all .15s;letter-spacing:.02em;text-transform:uppercase;white-space:nowrap}
-.nav-tab:hover{color:var(--cyan)}.nav-tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
-.nav-right{display:flex;align-items:center;gap:12px}
-.btn{padding:8px 20px;border-radius:50px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;border:none;letter-spacing:.03em}
-.btn-primary{background:var(--cyan);color:#fff}.btn-primary:hover{background:var(--cyan2)}
-.btn-outline{background:transparent;color:var(--cyan);border:1.5px solid var(--cyan)}.btn-outline:hover{background:var(--cyan-light)}
-.btn-sm{padding:6px 14px;font-size:12px}
-.btn-ghost{background:transparent;color:var(--text2);border:1.5px solid var(--gray2)}.btn-ghost:hover{border-color:var(--gray3)}
-.hero-band{background:linear-gradient(135deg,var(--navy) 0%,#0d2a4a 60%,#0a3d6b 100%);position:relative;overflow:hidden;padding:28px 32px 24px;color:#fff}
-.hero-band::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,rgba(41,171,226,.12) 1px,transparent 1px);background-size:28px 28px;pointer-events:none}
-.hero-eyebrow{font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--cyan);margin-bottom:6px}
-.hero-title{font-size:26px;font-weight:800;line-height:1.15;margin-bottom:4px}.hero-title span{color:var(--cyan)}
-.hero-sub{font-size:13px;color:#a0b4cc;margin-bottom:18px}
-.hero-stats{display:flex;gap:28px}
-.hero-stat-num{font-size:22px;font-weight:800;color:var(--cyan)}
-.hero-stat-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#a0b4cc;margin-top:2px}
-.page{display:none;animation:fadein .2s ease}.page.active{display:block}
-@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.section-eyebrow{font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--cyan);margin-bottom:4px}
-.section-title{font-size:20px;font-weight:800;color:var(--text);margin-bottom:16px}
-.find-leads-layout{display:grid;grid-template-columns:280px 1fr;gap:0;min-height:calc(100vh - 160px)}
-.filter-panel{background:#fff;border-right:1px solid var(--gray2);padding:20px;overflow-y:auto}
-.filter-group{margin-bottom:20px}
-.filter-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text2);margin-bottom:8px;display:block}
-.filter-select,.filter-input{width:100%;padding:8px 12px;border:1.5px solid var(--gray2);border-radius:8px;font-size:13px;color:var(--text);background:#fff;outline:none}
-.filter-select:focus,.filter-input:focus{border-color:var(--cyan)}
-.filter-tag-wrap{display:flex;flex-wrap:wrap;gap:6px}
-.filter-tag{padding:5px 10px;border-radius:50px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--gray2);color:var(--text2);background:#fff;transition:all .12s}
-.filter-tag.on{border-color:var(--cyan);color:var(--cyan);background:var(--cyan-light)}
-.filter-source{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid var(--gray2);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px}
-.filter-source.on{border-color:var(--cyan);background:var(--cyan-light);color:var(--cyan)}
-.source-dot{width:8px;height:8px;border-radius:50%}
-.titles-box{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1.5px solid var(--gray2);border-radius:8px;background:#fff;cursor:text;min-height:42px;align-items:center;transition:border-color .15s}
-.titles-box:focus-within{border-color:var(--cyan)}
-.title-pill{display:inline-flex;align-items:center;gap:4px;background:var(--cyan-light);color:var(--cyan2);border:1px solid var(--cyan-pale);border-radius:50px;padding:3px 10px;font-size:12px;font-weight:600;white-space:nowrap}
-.title-pill-x{cursor:pointer;font-size:15px;line-height:1;opacity:.6;margin-left:2px}.title-pill-x:hover{opacity:1}
-.titles-inp{border:none;outline:none;font-size:13px;flex:1;min-width:100px;background:transparent;padding:2px 0;color:var(--text)}
-.leads-pane{padding:20px;background:var(--gray)}
-.leads-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
-.leads-count{font-size:13px;color:var(--text2);font-weight:600}.leads-count span{color:var(--cyan);font-weight:800}
-.search-wrap{position:relative;flex:1;min-width:180px}
-.search-wrap input{width:100%;padding:8px 12px 8px 34px;border:1.5px solid var(--gray2);border-radius:50px;font-size:13px;outline:none;background:#fff}
-.search-wrap input:focus{border-color:var(--cyan)}
-.search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--gray3)}
-.leads-table-wrap{background:#fff;border-radius:12px;border:1px solid var(--gray2);overflow:hidden}
-.leads-table{width:100%;border-collapse:collapse;font-size:13px}
-.leads-table th{padding:10px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);background:var(--gray);border-bottom:1px solid var(--gray2)}
-.leads-table td{padding:11px 14px;border-bottom:1px solid var(--gray2);color:var(--text);vertical-align:middle}
-.leads-table tr:last-child td{border-bottom:none}
-.leads-table tr:hover td{background:#f8fbff}
-.leads-table input[type=checkbox]{width:15px;height:15px;accent-color:var(--cyan);cursor:pointer}
-.avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
-.lead-name-cell{display:flex;align-items:center;gap:10px}
-.lead-name{font-weight:600;color:var(--text)}.lead-sub{font-size:11px;color:var(--text2);margin-top:1px}
-.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700}
-.badge-verified{background:#dcfce7;color:#15803d}.badge-pending{background:#fef9c3;color:#854d0e}
-.action-btns{display:flex;gap:6px}
-.icon-btn{width:28px;height:28px;border-radius:6px;border:1.5px solid var(--gray2);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s}
-.icon-btn svg{width:13px;height:13px}
-.icon-btn.add:hover{border-color:var(--green);color:var(--green)}.icon-btn.ign:hover{border-color:var(--red);color:var(--red)}
-.loading-bar{text-align:center;padding:32px;color:var(--text2);font-size:13px}
-.spinner{width:28px;height:28px;border:3px solid var(--gray2);border-top-color:var(--cyan);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
-@keyframes spin{to{transform:rotate(360deg)}}
-.prospect-layout{padding:20px}
-.prospect-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:16px}
-.prospect-card{background:#fff;border-radius:12px;border:1px solid var(--gray2);overflow:hidden;transition:box-shadow .15s}
-.prospect-card:hover{box-shadow:0 4px 20px rgba(41,171,226,.12)}
-.p-card-hdr{background:linear-gradient(135deg,var(--navy),#0d2a4a);padding:16px;color:#fff;display:flex;align-items:center;gap:12px;position:relative}
-.p-card-hdr::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,rgba(41,171,226,.1) 1px,transparent 1px);background-size:20px 20px}
-.p-name{font-weight:800;font-size:15px}.p-role{font-size:11px;color:#a0b4cc;margin-top:2px}.p-co{font-size:11px;color:var(--cyan);margin-top:1px}
-.prospect-body{padding:14px}
-.prospect-meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
-.meta-chip{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2);background:var(--gray);padding:4px 8px;border-radius:50px}
-.ai-box{background:var(--cyan-light);border-left:3px solid var(--cyan);border-radius:0 6px 6px 0;padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px}
-.prospect-actions{display:flex;gap:6px;flex-wrap:wrap}
-.stage-badge{padding:3px 10px;border-radius:50px;font-size:11px;font-weight:700}
-.sn{background:#f1f5f9;color:#475569}.sr{background:#fef3c7;color:#92400e}.sm{background:#dbeafe;color:#1d4ed8}.srp{background:#dcfce7;color:#15803d}.sc{background:#ede9fe;color:#6d28d9}
-.research-layout{display:grid;grid-template-columns:260px 1fr;gap:0;min-height:calc(100vh - 160px)}
-.r-list{background:#fff;border-right:1px solid var(--gray2);padding:16px;overflow-y:auto}
-.r-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;cursor:pointer;transition:background .12s;margin-bottom:4px}
-.r-item:hover{background:var(--gray)}.r-item.active{background:var(--cyan-light);border:1.5px solid var(--cyan-pale)}
-.r-item-name{font-weight:600;font-size:13px}.r-item-co{font-size:11px;color:var(--text2)}
-.r-pane{padding:24px;background:var(--gray)}
-.r-card{background:#fff;border-radius:12px;border:1px solid var(--gray2);overflow:hidden}
-.r-card-top{background:linear-gradient(135deg,var(--navy),#0d2a4a);padding:20px 24px;display:flex;align-items:center;gap:16px;position:relative}
-.r-card-top::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,rgba(41,171,226,.12) 1px,transparent 1px);background-size:24px 24px}
-.r-card-body{padding:24px}
-.r-section{margin-bottom:24px}
-.r-section h3{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--cyan);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--cyan-pale)}
-.r-insight{display:flex;gap:10px;margin-bottom:10px;padding:10px 12px;background:var(--gray);border-radius:8px;font-size:13px;line-height:1.5}
-.msg-box{background:var(--navy);border-radius:10px;padding:16px 18px;color:#e0eaf5;font-size:13px;line-height:1.65;position:relative}
-.msg-box::before{content:"";position:absolute;inset:0;border-radius:10px;background-image:radial-gradient(circle,rgba(41,171,226,.07) 1px,transparent 1px);background-size:20px 20px}
-.msg-box p{position:relative}
-.ai-load{display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;padding:16px}
-.dot-pulse{display:flex;gap:4px}
-.dot-pulse span{width:7px;height:7px;background:var(--cyan);border-radius:50%;animation:pulse 1.2s ease-in-out infinite}
-.dot-pulse span:nth-child(2){animation-delay:.2s}.dot-pulse span:nth-child(3){animation-delay:.4s}
-@keyframes pulse{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
-.outreach-layout{display:grid;grid-template-columns:280px 1fr;gap:0;min-height:calc(100vh - 160px)}
-.o-list{background:#fff;border-right:1px solid var(--gray2);overflow-y:auto}
-.o-list-hdr{padding:14px 16px;border-bottom:1px solid var(--gray2);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}
-.o-item{padding:12px 16px;border-bottom:1px solid var(--gray2);cursor:pointer;display:flex;gap:10px;align-items:flex-start}
-.o-item:hover{background:var(--gray)}
-.o-item-info{flex:1;min-width:0}
-.o-item-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.o-item-prev{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-.o-pane{padding:24px;background:var(--gray);display:flex;flex-direction:column;gap:16px}
-.compose-card{background:#fff;border-radius:12px;border:1px solid var(--gray2)}
-.c-hdr{padding:14px 18px;border-bottom:1px solid var(--gray2);display:flex;align-items:center;justify-content:space-between}
-.c-hdr-title{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
-.c-tabs{display:flex;border-radius:50px;background:var(--gray);padding:3px}
-.c-tab{padding:5px 14px;border-radius:50px;font-size:12px;font-weight:700;cursor:pointer;color:var(--text2);transition:all .12s}
-.c-tab.active{background:var(--cyan);color:#fff}
-.c-body{padding:16px 18px}
-.c-textarea{width:100%;min-height:140px;border:1.5px solid var(--gray2);border-radius:8px;padding:12px;font-size:13px;font-family:inherit;line-height:1.6;color:var(--text);resize:vertical;outline:none}
-.c-textarea:focus{border-color:var(--cyan)}
-.c-footer{padding:10px 18px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
-.char-count{font-size:11px;color:var(--text2)}
-.seq-card{background:#fff;border-radius:12px;border:1px solid var(--gray2)}
-.seq-item{padding:12px 18px;border-bottom:1px solid var(--gray2);display:flex;align-items:center;gap:12px;font-size:13px}
-.seq-item:last-child{border-bottom:none}
-.seq-num{width:24px;height:24px;border-radius:50%;background:var(--cyan);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.settings-layout{padding:24px;max-width:720px}
-.s-card{background:#fff;border-radius:12px;border:1px solid var(--gray2);margin-bottom:16px;overflow:hidden}
-.s-card-hdr{padding:14px 20px;background:linear-gradient(135deg,var(--navy),#0d2a4a);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;gap:10px}
-.s-card-body{padding:20px}
-.s-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--gray2)}
-.s-row:last-child{border-bottom:none}
-.s-label{flex:1;font-size:13px;font-weight:600}.s-sub{font-size:11px;color:var(--text2);margin-top:2px}
-.s-input{flex:2;padding:8px 12px;border:1.5px solid var(--gray2);border-radius:8px;font-size:13px;outline:none}
-.s-input:focus{border-color:var(--cyan)}
-.toggle{width:40px;height:22px;border-radius:11px;background:var(--gray2);position:relative;cursor:pointer;transition:background .15s;flex-shrink:0}
-.toggle.on{background:var(--cyan)}
-.toggle::after{content:"";width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
-.toggle.on::after{transform:translateX(18px)}
-.conn-status{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700}
-.conn-dot{width:8px;height:8px;border-radius:50%}
-.conn-dot.ok{background:var(--green)}.conn-dot.off{background:var(--gray3)}
-.toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;z-index:999;border-left:3px solid var(--cyan);transform:translateY(80px);opacity:0;transition:all .3s}
-.toast.show{transform:none;opacity:1}
-.cyan-rule{height:3px;width:40px;background:var(--cyan);border-radius:2px;margin:10px 0}
-.pagination{text-align:center;padding:14px;font-size:13px;color:var(--text2)}
-.pagination a{color:var(--cyan);cursor:pointer;font-weight:600}
-.error-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;font-size:13px;color:#dc2626;margin-bottom:12px}
-</style>
-</head>
-<body>
-<div class="topbar"><span>SDR Pro - AI-Powered Sales Development</span><span style="margin-left:auto">Apollo - LinkedIn - Office 365</span></div>
-<nav>
-  <div class="logo">SDR<span>PRO</span></div>
-  <div class="nav-tabs">
-    <div class="nav-tab active" onclick="showPage('find')">Find Leads</div>
-    <div class="nav-tab" onclick="showPage('prospects')">Prospects</div>
-    <div class="nav-tab" onclick="showPage('research')">AI Research</div>
-    <div class="nav-tab" onclick="showPage('outreach')">Outreach</div>
-    <div class="nav-tab" onclick="showPage('settings')">Settings</div>
-  </div>
-  <div class="nav-right"><button class="btn btn-primary btn-sm" onclick="showPage('find')">+ New Search</button></div>
-</nav>
-<div class="hero-band">
-  <div class="hero-eyebrow">Your AI-Powered SDR Platform</div>
-  <div class="hero-title">OUTREACH. <span>AUTOMATED.</span> BULLETPROOF.</div>
-  <div class="hero-sub">Apollo - LinkedIn - Office 365 all in one intelligent workflow</div>
-  <div class="hero-stats">
-    <div><div class="hero-stat-num" id="stat-leads">0</div><div class="hero-stat-label">Total Leads</div></div>
-    <div><div class="hero-stat-num" id="stat-prospects">0</div><div class="hero-stat-label">Prospects</div></div>
-    <div><div class="hero-stat-num" id="stat-messaged">0</div><div class="hero-stat-label">Messaged</div></div>
-    <div><div class="hero-stat-num" id="stat-replies">0</div><div class="hero-stat-label">Replies</div></div>
-  </div>
-</div>
-<div class="page active" id="page-find">
-  <div class="find-leads-layout">
-    <div class="filter-panel">
-      <div class="section-eyebrow">Search Criteria</div>
-      <div class="cyan-rule"></div>
-      <div class="filter-group" style="margin-top:14px">
-        <span class="filter-label">Data Source</span>
-        <div class="filter-source on"><div class="source-dot" style="background:#0ea5e9"></div>Apollo.io<span style="margin-left:auto;font-size:10px;color:var(--green)">Live</span></div>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Job Titles - press Enter to add</span>
-        <div class="titles-box" id="titles-box">
-          <span id="titles-tags"></span>
-          <input id="titles-inp" class="titles-inp" placeholder="e.g. CEO, VP of IT..."/>
-        </div>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Seniority</span>
-        <div class="filter-tag-wrap">
-          <div class="filter-tag on" onclick="toggleTag(this)">C-Level</div>
-          <div class="filter-tag on" onclick="toggleTag(this)">VP</div>
-          <div class="filter-tag" onclick="toggleTag(this)">Director</div>
-          <div class="filter-tag" onclick="toggleTag(this)">Manager</div>
-        </div>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Company Size</span>
-        <div class="filter-tag-wrap">
-          <div class="filter-tag" onclick="toggleTag(this)">1-10</div>
-          <div class="filter-tag on" onclick="toggleTag(this)">11-50</div>
-          <div class="filter-tag on" onclick="toggleTag(this)">51-200</div>
-          <div class="filter-tag" onclick="toggleTag(this)">201-500</div>
-          <div class="filter-tag" onclick="toggleTag(this)">500+</div>
-        </div>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Industry</span>
-        <select class="filter-select" id="f-industry">
-          <option value="">All Industries</option>
-          <option value="Information Technology" selected>Information Technology</option>
-          <option value="Financial Services">Financial Services</option>
-          <option value="Healthcare">Healthcare</option>
-          <option value="Manufacturing">Manufacturing</option>
-          <option value="Legal">Legal</option>
-        </select>
-      </div>
-      <div class="filter-group"><span class="filter-label">Location</span><input class="filter-input" id="f-location" value="Denver, Colorado"/></div>
-      <div class="filter-group">
-        <span class="filter-label">Results per page</span>
-        <select class="filter-select" id="f-perpage"><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option></select>
-      </div>
-      <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="runSearch(1)">Search Apollo Live</button>
-    </div>
-    <div class="leads-pane">
-      <div id="leads-error"></div>
-      <div class="leads-toolbar">
-        <div class="leads-count">Showing <span id="leads-shown">0</span> of <span id="leads-total">0</span> leads</div>
-        <div class="search-wrap"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35" stroke-linecap="round"/></svg><input placeholder="Filter results..." oninput="filterTable(this.value)"/></div>
-        <button class="btn btn-primary btn-sm" onclick="bulkAdd()">+ Bulk Add Selected</button>
-        <button class="btn btn-ghost btn-sm" onclick="bulkIgnore()">Ignore Selected</button>
-      </div>
-      <div class="leads-table-wrap"><table class="leads-table"><thead><tr><th><input type="checkbox" onclick="selectAll(this)"/></th><th>Name</th><th>Company</th><th>Size</th><th>Location</th><th>Email</th><th>Actions</th></tr></thead><tbody id="leads-tbody"><tr><td colspan="7"><div class="loading-bar">Click Search Apollo Live to fetch real leads</div></td></tr></tbody></table></div>
-      <div class="pagination" id="pagination"></div>
-    </div>
-  </div>
-</div>
-<div class="page" id="page-prospects">
-  <div class="prospect-layout">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div><div class="section-eyebrow">Pipeline</div><div class="section-title">Prospect Manager</div></div>
-      <div style="display:flex;gap:8px"><select class="filter-select" style="width:auto;padding:6px 12px;font-size:13px" onchange="filterProspects(this.value)"><option value="">All Stages</option><option>New</option><option>Researching</option><option>Messaged</option><option>Replied</option></select><button class="btn btn-primary btn-sm" onclick="showPage('research')">Run AI Research</button></div>
-    </div>
-    <div class="prospect-grid" id="prospect-grid"></div>
-  </div>
-</div>
-<div class="page" id="page-research">
-  <div class="research-layout">
-    <div class="r-list"><div style="padding:14px 0 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text2)">Research Queue</div><div id="r-list-items"></div><button class="btn btn-primary btn-sm" style="width:100%;margin-top:12px" onclick="runAllResearch()">Research All</button></div>
-    <div class="r-pane" id="r-pane"><div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--text2)">Select a prospect to run AI research</div></div>
-  </div>
-</div>
-<div class="page" id="page-outreach">
-  <div class="outreach-layout">
-    <div class="o-list"><div class="o-list-hdr">Outreach Queue (<span id="o-count">0</span>)</div><div id="o-items"></div></div>
-    <div class="o-pane" id="o-pane"><div style="color:var(--text2);font-size:14px;text-align:center;padding:40px">Select a prospect to compose outreach</div></div>
-  </div>
-</div>
-<div class="page" id="page-settings">
-  <div class="settings-layout">
-    <div class="section-eyebrow">Configuration</div><div class="section-title">Settings and Integrations</div>
-    <div class="s-card"><div class="s-card-hdr">Apollo Integration</div><div class="s-card-body">
-      <div class="s-row"><div class="s-label">Proxy URL<div class="s-sub">Cloudflare Worker</div></div><input class="s-input" value="https://apollo-proxy.jason-939.workers.dev"/><div class="conn-status"><div class="conn-dot ok"></div>Live</div></div>
-      <div class="s-row"><div class="s-label">Apollo API Key<div class="s-sub">Stored in Cloudflare</div></div><input class="s-input" type="password" value="stored-securely"/><div class="conn-status"><div class="conn-dot ok"></div>Connected</div></div>
-    </div></div>
-    <div class="s-card"><div class="s-card-hdr">LinkedIn Integration</div><div class="s-card-body">
-      <div class="s-row"><div class="s-label">LinkedIn Account<div class="s-sub">Cross-referencing and drafting</div></div><div class="conn-status" style="margin-left:auto"><div class="conn-dot ok"></div>Authenticated</div><button class="btn btn-ghost btn-sm">Re-auth</button></div>
-      <div class="s-row"><div class="s-label">Auto-open LinkedIn on send</div><div class="toggle on" onclick="toggleEl(this)"></div></div>
-    </div></div>
-    <div class="s-card"><div class="s-card-hdr">Office 365 / Email</div><div class="s-card-body">
-      <div class="s-row"><div class="s-label">Microsoft 365 Account<div class="s-sub">Follow-up email sequences</div></div><div class="conn-status" style="margin-left:auto"><div class="conn-dot ok"></div>Connected</div></div>
-      <div class="s-row"><div class="s-label">Sender Name</div><input class="s-input" value="Jason - Workplace IT"/></div>
-      <div class="s-row"><div class="s-label">Reply-to Email</div><input class="s-input" value="jason@workplaceit.net"/></div>
-    </div></div>
-    <button class="btn btn-primary" style="margin-top:8px" onclick="toast('Settings saved')">Save Settings</button>
-  </div>
-</div>
-<div class="toast" id="toast"></div>
-<script>
-var PROXY="https://apollo-proxy.jason-939.workers.dev";
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>SDR Pro</title><style>*{box-sizing:border-box;margin:0;padding:0}:root{--navy:#0a1628;--cyan:#29abe2;--cyan2:#1da8cc;--cyan-light:#e8f7fd;--cyan-pale:#cceef9;--gray:#f5f7fa;--gray2:#e8ecf1;--gray3:#b0bbc8;--text:#1a2740;--text2:#4a5a72;--green:#22c55e;--red:#ef4444}body{font-family:Segoe UI,system-ui,sans-serif;background:var(--gray);color:var(--text);min-height:100vh;display:flex;flex-direction:column}.topbar{background:var(--navy);color:#a0b4cc;font-size:12px;padding:7px 24px;display:flex;gap:24px;align-items:center}nav{background:#fff;border-bottom:1px solid var(--gray2);display:flex;align-items:center;padding:0 24px;height:60px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.06)}.logo{font-size:22px;font-weight:800;letter-spacing:-1px;color:var(--navy);margin-right:32px}.logo span{color:var(--cyan)}.nav-tabs{display:flex;height:100%;gap:2px;flex:1}.nav-tab{display:flex;align-items:center;gap:7px;padding:0 16px;font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;border-bottom:3px solid transparent;transition:all .15s;letter-spacing:.02em;text-transform:uppercase;white-space:nowrap}.nav-tab:hover{color:var(--cyan)}.nav-tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}.nav-right{display:flex;align-items:center;gap:12px}.btn{padding:8px 20px;border-radius:50px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;border:none;letter-spacing:.03em}.btn-primary{background:var(--cyan);color:#fff}.btn-primary:hover{background:var(--cyan2)}.btn-outline{background:transparent;color:var(--cyan);border:1.5px solid var(--cyan)}.btn-outline:hover{background:var(--cyan-light)}.btn-sm{padding:6px 14px;font-size:12px}.btn-ghost{background:transparent;color:var(--text2);border:1.5px solid var(--gray2)}.btn-ghost:hover{border-color:var(--gray3)}.hero-band{background:linear-gradient(135deg,var(--navy) 0%,#0d2a4a 60%,#0a3d6b 100%);position:relative;overflow:hidden;padding:28px 32px 24px;color:#fff}.hero-band::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,rgba(41,171,226,.12) 1px,transparent 1px);background-size:28px 28px;pointer-events:none}.hero-eyebrow{font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--cyan);margin-bottom:6px}.hero-title{font-size:26px;font-weight:800;line-height:1.15;margin-bottom:4px}.hero-title span{color:var(--cyan)}.hero-sub{font-size:13px;color:#a0b4cc;margin-bottom:18px}.hero-stats{display:flex;gap:28px}.hero-stat-num{font-size:22px;font-weight:800;color:var(--cyan)}.hero-stat-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#a0b4cc;margin-top:2px}.page{display:none;animation:fadein .2s ease}.page.active{display:block}@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.section-eyebrow{font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--cyan);margin-bottom:4px}.section-title{font-size:20px;font-weight:800;color:var(--text);margin-bottom:16px}.find-leads-layout{display:grid;grid-template-columns:280px 1fr;gap:0;min-height:calc(100vh - 160px)}.filter-panel{background:#fff;border-right:1px solid var(--gray2);padding:20px;overflow-y:auto}.filter-group{margin-bottom:20px}.filter-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text2);margin-bottom:8px;display:block}.filter-select,.filter-input{width:100%;padding:8px 12px;border:1.5px solid var(--gray2);border-radius:8px;font-size:13px;color:var(--text);background:#fff;outline:none}.filter-select:focus,.filter-input:focus{border-color:var(--cyan)}.filter-tag-wrap{display:flex;flex-wrap:wrap;gap:6px}.filter-tag{padding:5px 10px;border-radius:50px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--gray2);color:var(--text2);background:#fff;transition:all .12s}.filter-tag.on{border-color:var(--cyan);color:var(--cyan);background:var(--cyan-light)}.filter-source{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid var(--gray2);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px}.filter-source.on{border-color:var(--cyan);background:var(--cyan-light);color:var(--cyan)}.source-dot{width:8px;height:8px;border-radius:50%}.titles-box{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1.5px solid var(--gray2);border-radius:8px;background:#fff;cursor:text;min-height:42px;align-items:center;transition:border-color .15s}.titles-box:focus-within{border-color:var(--cyan)}.title-pill{display:inline-flex;align-items:center;gap:4px;background:var(--cyan-light);color:var(--cyan2);border:1px solid var(--cyan-pale);border-radius:50px;padding:3px 10px;font-size:12px;font-weight:600;white-space:nowrap}.title-pill-x{cursor:pointer;font-size:15px;line-height:1;opacity:.6;margin-left:2px}.title-pill-x:hover{opacity:1}.titles-inp{border:none;outline:none;font-size:13px;flex:1;min-width:100px;background:transparent;padding:2px 0;color:var(--text)}.leads-pane{padding:20px;background:var(--gray)}.leads-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}.leads-count{font-size:13px;color:var(--text2);font-weight:600}.leads-count span{color:var(--cyan);font-weight:800}.search-wrap{position:relative;flex:1;min-width:180px}.search-wrap input{width:100%;padding:8px 12px 8px 34px;border:1.5px solid var(--gray2);border-radius:50px;font-size:13px;outline:none;background:#fff}.search-wrap input:focus{border-color:var(--cyan)}.search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--gray3)}.leads-table-wrap{background:#fff;border-radius:12px;border:1px solid var(--gray2);overflow:hidden}.leads-table{width:100%;border-collapse:collapse;font-size:13px}.leads-table th{padding:10px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);background:var(--gray);border-bottom:1px solid var(--gray2)}.leads-table td{padding:11px 14px;border-bottom:1px solid var(--gray2);color:var(--text);vertical-align:middle}.leads-table tr:last-child td{border-bottom:none}.leads-table tr:hover td{background:#f8fbff}.leads-table input[type=checkbox]{width:15px;height:15px;accent-color:var(--cyan);cursor:pointer}.avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}.lead-name-cell{display:flex;align-items:center;gap:10px}.lead-name{font-weight:600;color:var(--text)}.lead-sub{font-size:11px;color:var(--text2);margin-top:1px}.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700}.badge-verified{background:#dcfce7;color:#15803d}.badge-pending{background:#fef9c3;color:#854d0e}.action-btns{display:flex;gap:6px}.icon-btn{width:28px;height:28px;border-radius:6px;border:1.5px solid var(--gray2);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s}.icon-btn svg{width:13px;height:13px}.icon-btn.add:hover{border-color:var(--green);color:var(--green)}.icon-btn.ign:hover{border-color:var(--red);color:var(--red)}.loading-bar{text-align:center;padding:32px;color:var(--text2);font-size:13px}.spinner{width:28px;height:28px;border:3px solid var(--gray2);border-top-color:var(--cyan);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}@keyframes spin{to{transform:rotate(360deg)}}.prospect-layout{padding:20px}.prospect-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:16px}.prospect-card{background:#fff;border-radius:12px;border:1px solid var(--gray2);overflow:hidden;transition:box-shadow .15s}.prospect-card:hover{box-shadow:0 4px 20px rgba(41,171,226,.12)}.p-card-hdr{background:linear-gradient(135deg,var(--navy),#0d2a4a);padding:16px;color:#fff;display:flex;align-items:center;gap:12px;position:relative}.p-card-hdr::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,rgba(41,171,226,.1) 1px,transparent 1px);background-size:20px 20px}.p-name{font-weight:800;font-size:15px}.p-role{font-size:11px;color:#a0b4cc;margin-top:2px}.p-co{font-size:11px;color:var(--cyan);margin-top:1px}.prospect-body{padding:14px}.prospect-meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.meta-chip{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2);background:var(--gray);padding:4px 8px;border-radius:50px}.ai-box{background:var(--cyan-light);border-left:3px solid var(--cyan);border-radius:0 6px 6px 0;padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px}.prospect-actions{display:flex;gap:6px;flex-wrap:wrap}.stage-badge{padding:3px 10px;border-radius:50px;font-size:11px;font-weight:700}.sn{background:#f1f5f9;color:#475569}.sr{background:#fef3c7;color:#92400e}.sm{background:#dbeafe;color:#1d4ed8}.srp{background:#dcfce7;color:#15803d}.sc{background:#ede9fe;color:#6d28d9}.research-layout{display:grid;grid-template-columns:260px 1fr;gap:0;min-height:calc(100vh - 160px)}.r-list{background:#fff;border-right:1px solid var(--gray2);padding:16px;overflow-y:auto}.r-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;cursor:pointer;transition:background .12s;margin-bottom:4px}.r-item:hover{background:var(--gray)}.r-item.active{background:var(--cyan-light);border:1.5px solid var(--cyan-pale)}.r-item-name{font-weight:600;font-size:13px}.r-item-co{font-size:11px;color:var(--text2)}.r-pane{padding:24px;background:var(--gray)}.r-card{background:#fff;border-radius:12px;border:1px solid var(--gray2);overflow:hidden}.r-card-top{background:linear-gradient(135deg,var(--navy),#0d2a4a);padding:20px 24px;display:flex;align-items:center;gap:16px;position:relative}.r-card-top::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,rgba(41,171,226,.12) 1px,transparent 1px);background-size:24px 24px}.r-card-body{padding:24px}.r-section{margin-bottom:24px}.r-section h3{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--cyan);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--cyan-pale)}.r-insight{display:flex;gap:10px;margin-bottom:10px;padding:10px 12px;background:var(--gray);border-radius:8px;font-size:13px;line-height:1.5}.msg-box{background:var(--navy);border-radius:10px;padding:16px 18px;color:#e0eaf5;font-size:13px;line-height:1.65;position:relative}.msg-box::before{content:"";position:absolute;inset:0;border-radius:10px;background-image:radial-gradient(circle,rgba(41,171,226,.07) 1px,transparent 1px);background-size:20px 20px}.msg-box p{position:relative}.ai-load{display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;padding:16px}.dot-pulse{display:flex;gap:4px}.dot-pulse span{width:7px;height:7px;background:var(--cyan);border-radius:50%;animation:pulse 1.2s ease-in-out infinite}.dot-pulse span:nth-child(2){animation-delay:.2s}.dot-pulse span:nth-child(3){animation-delay:.4s}@keyframes pulse{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}.outreach-layout{display:grid;grid-template-columns:280px 1fr;gap:0;min-height:calc(100vh - 160px)}.o-list{background:#fff;border-right:1px solid var(--gray2);overflow-y:auto}.o-list-hdr{padding:14px 16px;border-bottom:1px solid var(--gray2);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}.o-item{padding:12px 16px;border-bottom:1px solid var(--gray2);cursor:pointer;display:flex;gap:10px;align-items:flex-start}.o-item:hover{background:var(--gray)}.o-item-info{flex:1;min-width:0}.o-item-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.o-item-prev{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}.o-pane{padding:24px;background:var(--gray);display:flex;flex-direction:column;gap:16px}.compose-card{background:#fff;border-radius:12px;border:1px solid var(--gray2)}.c-hdr{padding:14px 18px;border-bottom:1px solid var(--gray2);display:flex;align-items:center;justify-content:space-between}.c-hdr-title{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}.c-tabs{display:flex;border-radius:50px;background:var(--gray);padding:3px}.c-tab{padding:5px 14px;border-radius:50px;font-size:12px;font-weight:700;cursor:pointer;color:var(--text2);transition:all .12s}.c-tab.active{background:var(--cyan);color:#fff}.c-body{padding:16px 18px}.c-textarea{width:100%;min-height:140px;border:1.5px solid var(--gray2);border-radius:8px;padding:12px;font-size:13px;font-family:inherit;line-height:1.6;color:var(--text);resize:vertical;outline:none}.c-textarea:focus{border-color:var(--cyan)}.c-footer{padding:10px 18px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}.char-count{font-size:11px;color:var(--text2)}.seq-card{background:#fff;border-radius:12px;border:1px solid var(--gray2)}.seq-item{padding:12px 18px;border-bottom:1px solid var(--gray2);display:flex;align-items:center;gap:12px;font-size:13px}.seq-item:last-child{border-bottom:none}.seq-num{width:24px;height:24px;border-radius:50%;background:var(--cyan);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}.settings-layout{padding:24px;max-width:720px}.s-card{background:#fff;border-radius:12px;border:1px solid var(--gray2);margin-bottom:16px;overflow:hidden}.s-card-hdr{padding:14px 20px;background:linear-gradient(135deg,var(--navy),#0d2a4a);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;gap:10px}.s-card-body{padding:20px}.s-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--gray2)}.s-row:last-child{border-bottom:none}.s-label{flex:1;font-size:13px;font-weight:600}.s-sub{font-size:11px;color:var(--text2);margin-top:2px}.s-input{flex:2;padding:8px 12px;border:1.5px solid var(--gray2);border-radius:8px;font-size:13px;outline:none}.s-input:focus{border-color:var(--cyan)}.toggle{width:40px;height:22px;border-radius:11px;background:var(--gray2);position:relative;cursor:pointer;transition:background .15s;flex-shrink:0}.toggle.on{background:var(--cyan)}.toggle::after{content:"";width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.2)}.toggle.on::after{transform:translateX(18px)}.conn-status{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700}.conn-dot{width:8px;height:8px;border-radius:50%}.conn-dot.ok{background:var(--green)}.conn-dot.off{background:var(--gray3)}.toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;z-index:999;border-left:3px solid var(--cyan);transform:translateY(80px);opacity:0;transition:all .3s}.toast.show{transform:none;opacity:1}.cyan-rule{height:3px;width:40px;background:var(--cyan);border-radius:2px;margin:10px 0}.pagination{text-align:center;padding:14px;font-size:13px;color:var(--text2)}.pagination a{color:var(--cyan);cursor:pointer;font-weight:600}.error-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;font-size:13px;color:#dc2626;margin-bottom:12px}</style></head><body><div class="topbar"><span>SDR Pro - AI-Powered Sales Development</span><span style="margin-left:auto">Apollo - LinkedIn - Office 365</span></div><nav><div class="logo">SDR<span>PRO</span></div><div class="nav-tabs"><div class="nav-tab active" onclick="showPage('find')">Find Leads</div><div class="nav-tab" onclick="showPage('prospects')">Prospects</div><div class="nav-tab" onclick="showPage('research')">AI Research</div><div class="nav-tab" onclick="showPage('outreach')">Outreach</div><div class="nav-tab" onclick="showPage('settings')">Settings</div></div><div class="nav-right"><button class="btn btn-primary btn-sm" onclick="showPage('find')">+ New Search</button></div></nav><div class="hero-band"><div class="hero-eyebrow">Your AI-Powered SDR Platform</div><div class="hero-title">OUTREACH. <span>AUTOMATED.</span> BULLETPROOF.</div><div class="hero-sub">Apollo - LinkedIn - Office 365 all in one intelligent workflow</div><div class="hero-stats"><div><div class="hero-stat-num" id="stat-leads">0</div><div class="hero-stat-label">Total Leads</div></div><div><div class="hero-stat-num" id="stat-prospects">0</div><div class="hero-stat-label">Prospects</div></div><div><div class="hero-stat-num" id="stat-messaged">0</div><div class="hero-stat-label">Messaged</div></div><div><div class="hero-stat-num" id="stat-replies">0</div><div class="hero-stat-label">Replies</div></div></div></div><div class="page active" id="page-find"><div class="find-leads-layout"><div class="filter-panel"><div class="section-eyebrow">Search Criteria</div><div class="cyan-rule"></div><div class="filter-group" style="margin-top:14px"><span class="filter-label">Data Source</span><div class="filter-source on"><div class="source-dot" style="background:#0ea5e9"></div>Apollo.io<span style="margin-left:auto;font-size:10px;color:var(--green)">Live</span></div></div><div class="filter-group"><span class="filter-label">Job Titles - press Enter to add</span><div class="titles-box" id="titles-box"><span id="titles-tags"></span><input id="titles-inp" class="titles-inp" placeholder="e.g. CEO, VP of IT..."/></div></div><div class="filter-group"><span class="filter-label">Seniority</span><div class="filter-tag-wrap"><div class="filter-tag on" onclick="toggleTag(this)">C-Level</div><div class="filter-tag on" onclick="toggleTag(this)">VP</div><div class="filter-tag" onclick="toggleTag(this)">Director</div><div class="filter-tag" onclick="toggleTag(this)">Manager</div></div></div><div class="filter-group"><span class="filter-label">Company Size</span><div class="filter-tag-wrap"><div class="filter-tag" onclick="toggleTag(this)">1-10</div><div class="filter-tag on" onclick="toggleTag(this)">11-50</div><div class="filter-tag on" onclick="toggleTag(this)">51-200</div><div class="filter-tag" onclick="toggleTag(this)">201-500</div><div class="filter-tag" onclick="toggleTag(this)">500+</div></div></div><div class="filter-group"><span class="filter-label">Industry</span><select class="filter-select" id="f-industry"><option value="">All Industries</option><option value="Information Technology" selected>Information Technology</option><option value="Financial Services">Financial Services</option><option value="Healthcare">Healthcare</option><option value="Manufacturing">Manufacturing</option><option value="Legal">Legal</option></select></div><div class="filter-group"><span class="filter-label">Location</span><input class="filter-input" id="f-location" value="Denver, Colorado"/></div><div class="filter-group"><span class="filter-label">Results per page</span><select class="filter-select" id="f-perpage"><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option></select></div><button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="runSearch(1)">Search Apollo Live</button></div><div class="leads-pane"><div id="leads-error"></div><div class="leads-toolbar"><div class="leads-count">Showing <span id="leads-shown">0</span> of <span id="leads-total">0</span> leads</div><div class="search-wrap"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35" stroke-linecap="round"/></svg><input placeholder="Filter results..." oninput="filterTable(this.value)"/></div><button class="btn btn-primary btn-sm" onclick="bulkAdd()">+ Bulk Add Selected</button><button class="btn btn-ghost btn-sm" onclick="bulkIgnore()">Ignore Selected</button></div><div class="leads-table-wrap"><table class="leads-table"><thead><tr><th><input type="checkbox" onclick="selectAll(this)"/></th><th>Name</th><th>Company</th><th>Size</th><th>Location</th><th>Email</th><th>Actions</th></tr></thead><tbody id="leads-tbody"><tr><td colspan="7"><div class="loading-bar">Click Search Apollo Live to fetch real leads</div></td></tr></tbody></table></div><div class="pagination" id="pagination"></div></div></div></div><div class="page" id="page-prospects"><div class="prospect-layout"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div><div class="section-eyebrow">Pipeline</div><div class="section-title">Prospect Manager</div></div><div style="display:flex;gap:8px"><select class="filter-select" style="width:auto;padding:6px 12px;font-size:13px" onchange="filterProspects(this.value)"><option value="">All Stages</option><option>New</option><option>Researching</option><option>Messaged</option><option>Replied</option></select><button class="btn btn-primary btn-sm" onclick="showPage('research')">Run AI Research</button></div></div><div class="prospect-grid" id="prospect-grid"></div></div></div><div class="page" id="page-research"><div class="research-layout"><div class="r-list"><div style="padding:14px 0 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text2)">Research Queue</div><div id="r-list-items"></div><button class="btn btn-primary btn-sm" style="width:100%;margin-top:12px" onclick="runAllResearch()">Research All</button></div><div class="r-pane" id="r-pane"><div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--text2)">Select a prospect to run AI research</div></div></div></div><div class="page" id="page-outreach"><div class="outreach-layout"><div class="o-list"><div class="o-list-hdr">Outreach Queue (<span id="o-count">0</span>)</div><div id="o-items"></div></div><div class="o-pane" id="o-pane"><div style="color:var(--text2);font-size:14px;text-align:center;padding:40px">Select a prospect to compose outreach</div></div></div></div><div class="page" id="page-settings"><div class="settings-layout"><div class="section-eyebrow">Configuration</div><div class="section-title">Settings and Integrations</div><div class="s-card"><div class="s-card-hdr">Apollo Integration</div><div class="s-card-body"><div class="s-row"><div class="s-label">Proxy URL<div class="s-sub">Cloudflare Worker</div></div><input class="s-input" value="https://apollo-proxy.jason-939.workers.dev"/><div class="conn-status"><div class="conn-dot ok"></div>Live</div></div><div class="s-row"><div class="s-label">Apollo API Key<div class="s-sub">Stored in Cloudflare</div></div><input class="s-input" type="password" value="stored-securely"/><div class="conn-status"><div class="conn-dot ok"></div>Connected</div></div></div></div><div class="s-card"><div class="s-card-hdr">LinkedIn Integration</div><div class="s-card-body"><div class="s-row"><div class="s-label">LinkedIn Account<div class="s-sub">Cross-referencing and drafting</div></div><div class="conn-status" style="margin-left:auto"><div class="conn-dot ok"></div>Authenticated</div><button class="btn btn-ghost btn-sm">Re-auth</button></div><div class="s-row"><div class="s-label">Auto-open LinkedIn on send</div><div class="toggle on" onclick="toggleEl(this)"></div></div></div></div><div class="s-card"><div class="s-card-hdr">Office 365 / Email</div><div class="s-card-body"><div class="s-row"><div class="s-label">Microsoft 365<div class="s-sub">Follow-up email sequences</div></div><div class="conn-status" style="margin-left:auto"><div class="conn-dot ok"></div>Connected</div></div><div class="s-row"><div class="s-label">Sender Name</div><input class="s-input" value="Jason - Workplace IT"/></div><div class="s-row"><div class="s-label">Reply-to Email</div><input class="s-input" value="jason@workplaceit.net"/></div></div></div><button class="btn btn-primary" style="margin-top:8px" onclick="toast('Settings saved')">Save Settings</button></div></div><div class="toast" id="toast"></div><script>var PROXY="https://apollo-proxy.jason-939.workers.dev";
 var APOLLO_KEY="4j1OoTcIhPejsI-YMmnaqA";
 var COLORS=["#29abe2","#0ea5e9","#0d9488","#7c3aed","#db2777","#ea580c"];
 var leads=[],prospects=[],sel=new Set(),activeR=null,cModes={},curPage=1,totalLeads=0;
 var titleTags=["CEO","CTO","VP"];
-
 function gc(i){return COLORS[i%COLORS.length];}
-
 function renderTitleTags(){
-  var wrap=document.getElementById("titles-tags");
-  wrap.innerHTML=titleTags.map(function(t,i){
-    return "<span class=\"title-pill\">"+t+"<span class=\"title-pill-x\" onclick=\"removeTitle("+i+")\">&times;</span></span>";
-  }).join("");
+  var w=document.getElementById("titles-tags");
+  var html="";
+  for(var i=0;i<titleTags.length;i++){
+    html+='<span class="title-pill">'+titleTags[i]+'<span class="title-pill-x" onclick="removeTitle('+i+')">&times;</span></span>';
+  }
+  w.innerHTML=html;
 }
-
 function removeTitle(i){titleTags.splice(i,1);renderTitleTags();}
-
 function initTitles(){
   renderTitleTags();
-  var box=document.getElementById("titles-box");
   var inp=document.getElementById("titles-inp");
+  var box=document.getElementById("titles-box");
   box.addEventListener("click",function(){inp.focus();});
   inp.addEventListener("keydown",function(e){
     if(e.key==="Enter"||e.key===","){
       e.preventDefault();
-      var val=inp.value.trim().replace(/,$/,"");
-      if(val&&titleTags.indexOf(val)===-1){titleTags.push(val);renderTitleTags();}
+      var v=inp.value.trim().replace(/,$/,"");
+      if(v&&titleTags.indexOf(v)===-1){titleTags.push(v);renderTitleTags();}
       inp.value="";
-    } else if(e.key==="Backspace"&&inp.value===""&&titleTags.length){
+    }else if(e.key==="Backspace"&&inp.value===""&&titleTags.length){
       titleTags.pop();renderTitleTags();
     }
   });
 }
-
 async function runSearch(page){
   curPage=page||1;
   var tbody=document.getElementById("leads-tbody");
-  tbody.innerHTML="<tr><td colspan=7><div class=loading-bar><div class=spinner></div>Searching Apollo for live leads...</div></td></tr>";
+  tbody.innerHTML="<tr><td colspan=7><div class=loading-bar><div class=spinner></div>Searching Apollo...</div></td></tr>";
   document.getElementById("leads-error").innerHTML="";
   var location=document.getElementById("f-location").value;
   var industry=document.getElementById("f-industry").value;
   var perPage=parseInt(document.getElementById("f-perpage").value);
   var seniority=Array.from(document.querySelectorAll(".filter-tag.on")).map(function(t){return t.textContent.toLowerCase().replace("-","_").replace("c_level","c_suite");});
-  var body={page:curPage,per_page:perPage,person_titles:titleTags.length?titleTags:undefined,person_seniorities:seniority.length?seniority:undefined,organization_locations:location?[location]:undefined,contact_email_status:["verified","guessed","unavailable","bounced","pending_manual_fulfillment"]};
+  var body={page:curPage,per_page:perPage,person_seniorities:seniority.length?seniority:undefined,organization_locations:location?[location]:undefined,contact_email_status:["verified","guessed","unavailable","bounced","pending_manual_fulfillment"]};
+  if(titleTags.length)body.person_titles=titleTags;
   if(industry)body.q_organization_keyword_tags=[industry];
   try{
     var res=await fetch(PROXY+"/apollo/mixed_people/search",{method:"POST",headers:{"Content-Type":"application/json","X-Apollo-Key":APOLLO_KEY},body:JSON.stringify(body)});
     var data=await res.json();
     if(data.error||!data.people){document.getElementById("leads-error").innerHTML="<div class=error-box>Apollo error: "+(data.error||data.message||"Unknown error")+"</div>";tbody.innerHTML="";return;}
-    leads=data.people.map(function(p){return{id:p.id,name:(p.first_name||"")+" "+(p.last_name||""),title:p.title||"",company:p.organization?p.organization.name:(p.employment_history&&p.employment_history[0]?p.employment_history[0].organization_name:""),size:p.organization?fmtSz(p.organization.estimated_num_employees):"",location:[p.city,p.state].filter(Boolean).join(", ")||p.country||"",email:p.email||"",li:p.linkedin_url||"",av:((p.first_name||"?")[0]+(p.last_name||"?")[0]).toUpperCase()};});
+    leads=data.people.map(function(p){return{id:p.id,name:(p.first_name||"")+" "+(p.last_name||""),title:p.title||"",company:p.organization?p.organization.name:"",size:p.organization?fmtSz(p.organization.estimated_num_employees):"",location:[p.city,p.state].filter(Boolean).join(", ")||p.country||"",email:p.email||"",li:p.linkedin_url||"",av:((p.first_name||"?")[0]+(p.last_name||"?")[0]).toUpperCase()};});
     totalLeads=data.pagination?data.pagination.total_entries:leads.length;
-    renderLeads();renderPagination(data.pagination,perPage);
-    toast("Found "+totalLeads.toLocaleString()+" leads from Apollo");
-  }catch(e){document.getElementById("leads-error").innerHTML="<div class=error-box>Connection error: "+e.message+"</div>";tbody.innerHTML="";}
+    renderLeads();renderPagination(data.pagination,perPage);toast("Found "+totalLeads.toLocaleString()+" leads from Apollo");
+  }catch(e){document.getElementById("leads-error").innerHTML="<div class=error-box>Error: "+e.message+"</div>";tbody.innerHTML="";}
 }
-
 function fmtSz(n){if(!n)return"Unknown";if(n<11)return"1-10 emp";if(n<51)return"11-50 emp";if(n<201)return"51-200 emp";if(n<501)return"201-500 emp";return"500+ emp";}
-
-function renderPagination(pag,perPage){
-  if(!pag)return;
-  var pages=Math.ceil(pag.total_entries/perPage);
-  var html="Page "+curPage+" of "+pages.toLocaleString()+" &nbsp;";
-  if(curPage>1)html+="<a onclick=\"runSearch("+(curPage-1)+")\">&larr; Prev</a> &nbsp;";
-  if(curPage<pages)html+="<a onclick=\"runSearch("+(curPage+1)+")\"">Next &rarr;</a>";
-  document.getElementById("pagination").innerHTML=html;
-}
-
+function renderPagination(pag,pp){if(!pag)return;var pages=Math.ceil(pag.total_entries/pp);var h="Page "+curPage+" of "+pages.toLocaleString()+" ";if(curPage>1)h+="<a onclick=\"runSearch("+(curPage-1)+")\">&larr; Prev</a> ";if(curPage<pages)h+="<a onclick=\"runSearch("+(curPage+1)+")\"">Next &rarr;</a>";document.getElementById("pagination").innerHTML=h;}
 function renderLeads(){
   var tb=document.getElementById("leads-tbody");
-  if(!leads.length){tb.innerHTML="<tr><td colspan=7><div class=loading-bar>No leads found. Try adjusting your filters.</div></td></tr>";return;}
-  tb.innerHTML=leads.map(function(l,i){
-    return "<tr><td><input type=checkbox "+(sel.has(l.id)?"checked":"")+" onchange=\"toggleL('"+l.id+"',this.checked)\"/></td>"+
-      "<td><div class=lead-name-cell><div class=avatar style=\"background:"+gc(i)+"\">"+(l.av)+"</div><div><div class=lead-name>"+l.name+"</div><div class=lead-sub>"+l.title+"</div></div></div></td>"+
-      "<td>"+(l.company||"-")+"</td><td>"+(l.size||"-")+"</td><td>"+(l.location||"-")+"</td>"+
-      "<td>"+(l.email?"<span class=badge-verified style=\"display:inline-flex;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;background:#dcfce7;color:#15803d\">"+l.email+"</span>":"<span style=\"display:inline-flex;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;background:#fef9c3;color:#854d0e\">Not available</span>")+"</td>"+
-      "<td><div class=action-btns><div class=\"icon-btn add\" onclick=\"addP('"+l.id+"')\" title=Add><svg fill=none stroke=currentColor viewBox=\"0 0 24 24\"><path d=\"M12 5v14m-7-7h14\" stroke-linecap=round stroke-linejoin=round stroke-width=2/></svg></div>"+
-      "<div class=\"icon-btn ign\" onclick=\"ignOne('"+l.id+"')\" title=Ignore><svg fill=none stroke=currentColor viewBox=\"0 0 24 24\"><path d=\"M18 6L6 18M6 6l12 12\" stroke-linecap=round stroke-width=2/></svg></div></div></td></tr>";
-  }).join("");
+  if(!leads.length){tb.innerHTML="<tr><td colspan=7><div class=loading-bar>No leads found.</div></td></tr>";return;}
+  var rows="";
+  for(var i=0;i<leads.length;i++){
+    var l=leads[i];
+    rows+="<tr><td><input type=checkbox "+(sel.has(l.id)?"checked":"")+" onchange=\"toggleL('"+l.id+"',this.checked)\"/></td>";
+    rows+="<td><div class=lead-name-cell><div class=avatar style=\"background:"+gc(i)+"\">"+(l.av||"")+"</div><div><div class=lead-name>"+l.name+"</div><div class=lead-sub>"+l.title+"</div></div></div></td>";
+    rows+="<td>"+(l.company||"-")+"</td><td>"+(l.size||"-")+"</td><td>"+(l.location||"-")+"</td>";
+    rows+="<td>"+(l.email?"<span class=badge-verified style=\"display:inline-flex;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;background:#dcfce7;color:#15803d\">"+l.email+"</span>":"<span class=badge-pending style=\"display:inline-flex;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;background:#fef9c3;color:#854d0e\">Not available</span>")+"</td>";
+    rows+="<td><div class=action-btns><div class=\"icon-btn add\" onclick=\"addP('"+l.id+"')\" title=Add><svg fill=none stroke=currentColor viewBox=\"0 0 24 24\"><path d=\"M12 5v14m-7-7h14\" stroke-linecap=round stroke-linejoin=round stroke-width=2/></svg></div><div class=\"icon-btn ign\" onclick=\"ignOne('"+l.id+"')\" title=Ignore><svg fill=none stroke=currentColor viewBox=\"0 0 24 24\"><path d=\"M18 6L6 18M6 6l12 12\" stroke-linecap=round stroke-width=2/></svg></div></div></td></tr>";
+  }
+  tb.innerHTML=rows;
   document.getElementById("leads-shown").textContent=leads.length;
   document.getElementById("leads-total").textContent=totalLeads.toLocaleString();
   updateStats();
 }
-
 function toggleL(id,on){on?sel.add(id):sel.delete(id);}
 function selectAll(cb){leads.forEach(function(l){cb.checked?sel.add(l.id):sel.delete(l.id);});renderLeads();}
 function addP(id){var l=leads.find(function(x){return x.id===id;});if(!l||prospects.find(function(p){return p.id===id;}))return;prospects.push(Object.assign({},l,{stage:"new"}));leads.splice(leads.indexOf(l),1);toast(l.name+" added to Prospects");updateStats();renderLeads();renderProspects();renderRL();renderOutreach();}
@@ -380,107 +76,27 @@ function bulkAdd(){if(!sel.size){toast("Select leads first");return;}Array.from(
 function ignOne(id){leads.splice(leads.findIndex(function(l){return l.id===id;}),1);renderLeads();toast("Lead ignored");}
 function bulkIgnore(){sel.forEach(function(id){leads.splice(leads.findIndex(function(l){return l.id===id;}),1);});sel.clear();renderLeads();}
 function filterTable(q){document.querySelectorAll("#leads-tbody tr").forEach(function(r){r.style.display=r.textContent.toLowerCase().includes(q.toLowerCase())?"":"none";});}
-
-function renderProspects(filter){
-  var g=document.getElementById("prospect-grid");
-  var list=filter?prospects.filter(function(p){return sName(p.stage)===filter;}):prospects;
-  if(!list.length){g.innerHTML="<div style=\"color:var(--text2);grid-column:1/-1;padding:32px;text-align:center\">"+(prospects.length?"No prospects match this filter.":"No prospects yet. Add leads from Find Leads.")+"</div>";return;}
-  g.innerHTML=list.map(function(p,i){
-    return "<div class=prospect-card><div class=p-card-hdr><div class=avatar style=\"background:"+gc(i)+";width:44px;height:44px;font-size:14px;position:relative\">"+p.av+"</div><div style=position:relative><div class=p-name>"+p.name+"</div><div class=p-role>"+p.title+"</div><div class=p-co>"+p.company+"</div></div><span class=\"stage-badge s"+p.stage[0]+"\" style=\"margin-left:auto;position:relative\">"+sName(p.stage)+"</span></div>"+
-      "<div class=prospect-body><div class=prospect-meta><div class=meta-chip>"+(p.size||"")+"</div><div class=meta-chip>"+(p.location||"")+"</div>"+(p.email?"<div class=meta-chip>"+p.email+"</div>":"")+"</div>"+
-      (p.aiS?"<div class=ai-box><strong>AI: </strong>"+p.aiS+"</div>":"<div class=\"ai-box\" style=\"color:var(--gray3);border-left-color:var(--gray3)\">AI research not yet run</div>")+
-      "<div class=prospect-actions><button class=\"btn btn-primary btn-sm\" onclick=\"goR('"+p.id+"')\"">Research</button><button class=\"btn btn-outline btn-sm\" onclick=\"goO('"+p.id+"')\"">Outreach</button><button class=\"btn btn-ghost btn-sm\" onclick=\"nextStage('"+p.id+"')\"">Next Stage</button></div></div></div>";
-  }).join("");
-  document.getElementById("stat-prospects").textContent=prospects.length;
-}
-
+function renderProspects(filter){var g=document.getElementById("prospect-grid");var list=filter?prospects.filter(function(p){return sName(p.stage)===filter;}):prospects;if(!list.length){g.innerHTML="<div style=\"color:var(--text2);grid-column:1/-1;padding:32px;text-align:center\">"+(prospects.length?"No match.":"No prospects yet. Add from Find Leads.")+"</div>";return;}var html="";for(var i=0;i<list.length;i++){var p=list[i];html+="<div class=prospect-card><div class=p-card-hdr><div class=avatar style=\"background:"+gc(i)+";width:44px;height:44px;font-size:14px;position:relative\">"+p.av+"</div><div style=position:relative><div class=p-name>"+p.name+"</div><div class=p-role>"+p.title+"</div><div class=p-co>"+p.company+"</div></div><span class=\"stage-badge s"+p.stage[0]+"\" style=\"margin-left:auto;position:relative\">"+sName(p.stage)+"</span></div><div class=prospect-body><div class=prospect-meta><div class=meta-chip>"+(p.size||"")+"</div><div class=meta-chip>"+(p.location||"")+"</div>"+(p.email?"<div class=meta-chip>"+p.email+"</div>":"")+"</div>"+(p.aiS?"<div class=ai-box><strong>AI: </strong>"+p.aiS+"</div>":"<div class=ai-box style=\"color:var(--gray3);border-left-color:var(--gray3)\">AI research not yet run</div>")+"<div class=prospect-actions><button class=\"btn btn-primary btn-sm\" onclick=\"goR('"+p.id+"')\"">Research</button><button class=\"btn btn-outline btn-sm\" onclick=\"goO('"+p.id+"')\"">Outreach</button><button class=\"btn btn-ghost btn-sm\" onclick=\"nextStage('"+p.id+"')\"">Next Stage</button></div></div></div>";}g.innerHTML=html;document.getElementById("stat-prospects").textContent=prospects.length;}
 function filterProspects(val){renderProspects(val);}
 function sName(s){return{new:"New",research:"Researching",messaged:"Messaged",replied:"Replied",call:"Call Sched."}[s]||s;}
 function nextStage(id){var p=prospects.find(function(x){return x.id===id;});var st=["new","research","messaged","replied","call"];p.stage=st[(st.indexOf(p.stage)+1)%st.length];renderProspects();}
 function goR(id){showPage("research");setTimeout(function(){selectR(id);},50);}
 function goO(id){showPage("outreach");setTimeout(function(){selectO(id);},50);}
-
-function renderRL(){
-  document.getElementById("r-list-items").innerHTML=prospects.map(function(p,i){
-    return "<div class=\"r-item "+(activeR===p.id?"active":"")+"\" onclick=\"selectR('"+p.id+"')\""><div class=avatar style=\"background:"+gc(i)+";width:34px;height:34px;font-size:12px;flex-shrink:0\">"+p.av+"</div><div><div class=r-item-name>"+p.name+(p.aiS?" &check;":"")+"</div><div class=r-item-co>"+p.company+"</div></div></div>";
-  }).join("");
-}
-
-function selectR(id){
-  activeR=id;renderRL();
-  var p=prospects.find(function(x){return x.id===id;});
-  if(p.aiS){showRResult(p);return;}
-  document.getElementById("r-pane").innerHTML="<div class=r-card><div class=r-card-top><div class=avatar style=\"background:"+gc(prospects.indexOf(p))+";width:52px;height:52px;font-size:17px;position:relative\">"+p.av+"</div><div style=position:relative><div style=\"font-size:18px;font-weight:800;color:#fff\">"+p.name+"</div><div style=\"font-size:13px;color:#a0b4cc\">"+p.title+" at "+p.company+"</div></div></div><div class=r-card-body><div class=ai-load><div class=dot-pulse><span></span><span></span><span></span></div>Ready to research "+p.name+"</div><button class=\"btn btn-primary\" style=\"margin-top:12px\" onclick=\"runR('"+p.id+"')\"">Run AI Research Now</button></div></div>";
-}
-
-function runR(id){
-  var p=prospects.find(function(x){return x.id===id;});
-  var ld=document.querySelector(".ai-load");
-  if(ld)ld.innerHTML="<div class=dot-pulse><span></span><span></span><span></span></div> Analyzing profile and generating message...";
-  setTimeout(function(){
-    p.aiS=p.company+" is growing and likely has IT infrastructure needs. "+p.name+" is a key decision-maker worth a personalized outreach.";
-    p.insights=[{t:p.company+" - decision maker with budget authority"},{t:"Located in "+(p.location||"your target area")+" - local relationship opportunity"},{t:p.email?"Email available: "+p.email:"LinkedIn outreach recommended"},{t:"Personalized intro message generated below"}];
-    p.msg="Hi "+p.name.split(" ")[0]+", I noticed "+p.company+" is growing and wanted to reach out. We help companies in "+(p.location||"your area")+" keep their IT completely off their plate - 24/7 monitoring, no surprises, and a local team that actually picks up the phone. Would love to share how we have helped similar businesses. Open to a quick 15-min call?";
-    p.stage="research";showRResult(p);renderProspects();renderRL();updateStats();toast("AI research complete for "+p.name);
-  },2000);
-}
-
-function showRResult(p){
-  document.getElementById("r-pane").innerHTML="<div class=r-card><div class=r-card-top><div class=avatar style=\"background:"+gc(prospects.indexOf(p))+";width:52px;height:52px;font-size:17px;position:relative\">"+p.av+"</div><div style=position:relative><div style=\"font-size:18px;font-weight:800;color:#fff\">"+p.name+"</div><div style=\"font-size:13px;color:#a0b4cc\">"+p.title+" at "+p.company+"</div>"+(p.email?"<div style=\"font-size:12px;color:var(--cyan);margin-top:2px\">"+p.email+"</div>":"")+"</div><button class=\"btn btn-primary btn-sm\" style=\"margin-left:auto;position:relative\" onclick=\"goO('"+p.id+"')\"">Compose Outreach</button></div><div class=r-card-body><div class=r-section><h3>AI Insights</h3>"+(p.insights||[]).map(function(i){return "<div class=r-insight><span style=\"margin-right:6px;color:var(--cyan)\">&#10022;</span><span>"+i.t+"</span></div>";}).join("")+"</div><div class=r-section><h3>Suggested LinkedIn Message</h3><div class=msg-box><p>"+p.msg+"</p></div><div style=\"display:flex;gap:8px;margin-top:10px\"><button class=\"btn btn-primary btn-sm\" onclick=\"goO('"+p.id+"')\"">Use This Message</button><button class=\"btn btn-ghost btn-sm\" onclick=\"regenR('"+p.id+"')\"">Regenerate</button></div></div></div></div>";
-}
-
+function renderRL(){var html="";for(var i=0;i<prospects.length;i++){var p=prospects[i];html+="<div class=\"r-item "+(activeR===p.id?"active":"")+"\" onclick=\"selectR('"+p.id+"')\""><div class=avatar style=\"background:"+gc(i)+";width:34px;height:34px;font-size:12px;flex-shrink:0\">"+p.av+"</div><div><div class=r-item-name>"+p.name+(p.aiS?" ✓":"")+"</div><div class=r-item-co>"+p.company+"</div></div></div>";}document.getElementById("r-list-items").innerHTML=html;}
+function selectR(id){activeR=id;renderRL();var p=prospects.find(function(x){return x.id===id;});if(p.aiS){showRResult(p);return;}document.getElementById("r-pane").innerHTML="<div class=r-card><div class=r-card-top><div class=avatar style=\"background:"+gc(prospects.indexOf(p))+";width:52px;height:52px;font-size:17px;position:relative\">"+p.av+"</div><div style=position:relative><div style=\"font-size:18px;font-weight:800;color:#fff\">"+p.name+"</div><div style=\"font-size:13px;color:#a0b4cc\">"+p.title+" at "+p.company+"</div></div></div><div class=r-card-body><div class=ai-load><div class=dot-pulse><span></span><span></span><span></span></div>Ready to research "+p.name+"</div><button class=\"btn btn-primary\" style=\"margin-top:12px\" onclick=\"runR('"+p.id+"')\"">Run AI Research Now</button></div></div>";}
+function runR(id){var p=prospects.find(function(x){return x.id===id;});var ld=document.querySelector(".ai-load");if(ld)ld.innerHTML="<div class=dot-pulse><span></span><span></span><span></span></div> Analyzing...";setTimeout(function(){p.aiS=p.company+" is growing and has IT infrastructure needs. "+p.name+" is a key decision-maker.";p.insights=[{t:p.company+" - decision maker with budget authority"},{t:"Located in "+(p.location||"your area")+" - local opportunity"},{t:p.email?"Email: "+p.email:"LinkedIn outreach recommended"},{t:"Custom intro message generated below"}];p.msg="Hi "+p.name.split(" ")[0]+", I noticed "+p.company+" is growing and wanted to reach out. We help companies in "+(p.location||"your area")+" keep IT off their plate - 24/7 monitoring, no surprises, local team. Would love to show how we helped similar businesses. Open to a quick 15-min call?";p.stage="research";showRResult(p);renderProspects();renderRL();updateStats();toast("AI research complete for "+p.name);},2000);}
+function showRResult(p){document.getElementById("r-pane").innerHTML="<div class=r-card><div class=r-card-top><div class=avatar style=\"background:"+gc(prospects.indexOf(p))+";width:52px;height:52px;font-size:17px;position:relative\">"+p.av+"</div><div style=position:relative><div style=\"font-size:18px;font-weight:800;color:#fff\">"+p.name+"</div><div style=\"font-size:13px;color:#a0b4cc\">"+p.title+" at "+p.company+"</div>"+(p.email?"<div style=\"font-size:12px;color:var(--cyan);margin-top:2px\">"+p.email+"</div>":"")+"</div><button class=\"btn btn-primary btn-sm\" style=\"margin-left:auto;position:relative\" onclick=\"goO('"+p.id+"')\"">Compose Outreach</button></div><div class=r-card-body><div class=r-section><h3>AI Insights</h3>"+(p.insights||[]).map(function(ins){return"<div class=r-insight><span style=\"margin-right:6px;color:var(--cyan)\">&#10022;</span><span>"+ins.t+"</span></div>";}).join("")+"</div><div class=r-section><h3>Suggested LinkedIn Message</h3><div class=msg-box><p>"+p.msg+"</p></div><div style=\"display:flex;gap:8px;margin-top:10px\"><button class=\"btn btn-primary btn-sm\" onclick=\"goO('"+p.id+"')\"">Use This Message</button><button class=\"btn btn-ghost btn-sm\" onclick=\"regenR('"+p.id+"')\"">Regenerate</button></div></div></div></div>";}
 function runAllResearch(){prospects.filter(function(p){return !p.aiS;}).forEach(function(p){selectR(p.id);setTimeout(function(){runR(p.id);},200);});toast("Running AI research on all prospects...");}
 function regenR(id){var p=prospects.find(function(x){return x.id===id;});p.aiS=null;selectR(id);setTimeout(function(){runR(id);},100);}
-
-function renderOutreach(){
-  document.getElementById("o-items").innerHTML=prospects.map(function(p,i){
-    return "<div class=o-item onclick=\"selectO('"+p.id+"')\""><div class=avatar style=\"background:"+gc(i)+";width:36px;height:36px;font-size:12px;flex-shrink:0\">"+p.av+"</div><div class=o-item-info><div class=o-item-name>"+p.name+"</div><div class=o-item-prev>"+(p.msg?p.msg.substring(0,50)+"...":"No message yet")+"</div></div></div>";
-  }).join("");
-  document.getElementById("o-count").textContent=prospects.length;
-}
-
-function selectO(id){
-  var p=prospects.find(function(x){return x.id===id;});
-  var mode=cModes[id]||"linkedin";
-  document.getElementById("o-pane").innerHTML=
-    "<div class=compose-card><div class=c-hdr><div class=c-hdr-title><div class=avatar style=\"background:"+gc(prospects.indexOf(p))+";width:28px;height:28px;font-size:11px\">"+p.av+"</div>"+p.name+" - "+p.company+"</div>"+
-    "<div class=c-tabs><div class=\"c-tab "+(mode==="linkedin"?"active":"")+"\" onclick=\"setMode('"+p.id+"','linkedin')\"">LinkedIn</div><div class=\"c-tab "+(mode==="email"?"active":"")+"\" onclick=\"setMode('"+p.id+"','email')\"">Email</div></div></div>"+
-    "<div class=c-body>"+(mode==="email"?"<input class=filter-input placeholder=Subject... style=\"margin-bottom:8px\" value=\"Quick question about "+p.company+"\"/>":"")+"<textarea class=c-textarea id=\"msg-"+p.id+"\" oninput=\"updCC('"+p.id+"')\">"+(p.msg||"")+"</textarea></div>"+
-    "<div class=c-footer><span class=char-count id=\"cc-"+p.id+"\">"+(p.msg||"").length+" chars"+(mode==="linkedin"?" / 300 limit":"")+"</span>"+
-    "<div style=\"display:flex;gap:8px\"><button class=\"btn btn-ghost btn-sm\" onclick=\"regenO('"+p.id+"')\"">Regenerate</button><button class=\"btn btn-primary btn-sm\" onclick=\"sendO('"+p.id+"','"+mode+"')\">"+(mode==="linkedin"?"Open LinkedIn":"Send Email")+"</button></div></div></div>"+
-    "<div class=seq-card><div class=c-hdr style=\"padding:12px 18px\"><div class=c-hdr-title style=\"font-size:13px\">Follow-up Sequence</div><button class=\"btn btn-outline btn-sm\">+ Add Step</button></div>"+
-    "<div class=seq-item><div class=seq-num>1</div><div style=flex:1>LinkedIn intro message<br><span style=\"font-size:11px;color:var(--text2)\">Day 1 - Manual send</span></div><span class=\"badge "+(p.stage==="messaged"||p.stage==="replied"?"badge-verified":"badge-pending")+"\">"+(p.stage==="messaged"||p.stage==="replied"?"Sent":"Pending")+"</span></div>"+
-    "<div class=seq-item><div class=seq-num>2</div><div style=flex:1>Follow-up email - value prop<br><span style=\"font-size:11px;color:var(--text2)\">Day 4 - Auto via Office 365</span></div><span class=\"badge badge-pending\">Pending</span></div>"+
-    "<div class=seq-item><div class=seq-num>3</div><div style=flex:1>Final email - soft close<br><span style=\"font-size:11px;color:var(--text2)\">Day 10 - Auto via Office 365</span></div><span class=\"badge badge-pending\">Pending</span></div></div>";
-}
-
+function renderOutreach(){var html="";for(var i=0;i<prospects.length;i++){var p=prospects[i];html+="<div class=o-item onclick=\"selectO('"+p.id+"')\""><div class=avatar style=\"background:"+gc(i)+";width:36px;height:36px;font-size:12px;flex-shrink:0\">"+p.av+"</div><div class=o-item-info><div class=o-item-name>"+p.name+"</div><div class=o-item-prev>"+(p.msg?p.msg.substring(0,50)+"...":"No message yet")+"</div></div></div>";}document.getElementById("o-items").innerHTML=html;document.getElementById("o-count").textContent=prospects.length;}
+function selectO(id){var p=prospects.find(function(x){return x.id===id;});var mode=cModes[id]||"linkedin";var html="<div class=compose-card><div class=c-hdr><div class=c-hdr-title><div class=avatar style=\"background:"+gc(prospects.indexOf(p))+";width:28px;height:28px;font-size:11px\">"+p.av+"</div>"+p.name+" - "+p.company+"</div><div class=c-tabs><div class=\"c-tab "+(mode==="linkedin"?"active":"")+"\" onclick=\"setMode('"+p.id+"','linkedin')\"">LinkedIn</div><div class=\"c-tab "+(mode==="email"?"active":"")+"\" onclick=\"setMode('"+p.id+"','email')\"">Email</div></div></div><div class=c-body>"+(mode==="email"?"<input class=filter-input placeholder=Subject... style=\"margin-bottom:8px\" value=\"Re: "+p.company+"\"/>":"")+"<textarea class=c-textarea id=\"msg-"+p.id+"\" oninput=\"updCC('"+p.id+"')\">"+(p.msg||"")+"</textarea></div><div class=c-footer><span class=char-count id=\"cc-"+p.id+"\">"+(p.msg||"").length+" chars"+(mode==="linkedin"?" / 300 limit":"")+"</span><div style=\"display:flex;gap:8px\"><button class=\"btn btn-ghost btn-sm\" onclick=\"regenO('"+p.id+"')\"">Regenerate</button><button class=\"btn btn-primary btn-sm\" onclick=\"sendO('"+p.id+"','"+mode+"')\">"+(mode==="linkedin"?"Open LinkedIn":"Send Email")+"</button></div></div></div><div class=seq-card><div class=c-hdr style=\"padding:12px 18px\"><div class=c-hdr-title style=\"font-size:13px\">Follow-up Sequence</div><button class=\"btn btn-outline btn-sm\">+ Add Step</button></div><div class=seq-item><div class=seq-num>1</div><div style=flex:1>LinkedIn intro<br><span style=\"font-size:11px;color:var(--text2)\">Day 1 - Manual</span></div><span class=\"badge "+(p.stage==="messaged"||p.stage==="replied"?"badge-verified":"badge-pending")+"\">"+(p.stage==="messaged"||p.stage==="replied"?"Sent":"Pending")+"</span></div><div class=seq-item><div class=seq-num>2</div><div style=flex:1>Follow-up email<br><span style=\"font-size:11px;color:var(--text2)\">Day 4 - Office 365</span></div><span class=\"badge badge-pending\">Pending</span></div><div class=seq-item><div class=seq-num>3</div><div style=flex:1>Soft close email<br><span style=\"font-size:11px;color:var(--text2)\">Day 10 - Office 365</span></div><span class=\"badge badge-pending\">Pending</span></div></div>";document.getElementById("o-pane").innerHTML=html;}
 function setMode(id,m){cModes[id]=m;selectO(id);}
 function updCC(id){var ta=document.getElementById("msg-"+id);var cc=document.getElementById("cc-"+id);if(ta&&cc)cc.textContent=ta.value.length+" chars";}
 function sendO(id,mode){var p=prospects.find(function(x){return x.id===id;});p.stage="messaged";if(mode==="linkedin"&&p.li)window.open(p.li,"_blank");renderProspects();renderOutreach();updateStats();toast(mode==="linkedin"?"Opening LinkedIn for "+p.name+"...":"Email queued for "+p.name);}
-function regenO(id){var p=prospects.find(function(x){return x.id===id;});p.msg="Hi "+p.name.split(" ")[0]+", saw your team is growing at "+p.company+". We help businesses keep IT off their plate - 24/7, no surprises. Worth a quick call?";selectO(id);}
-
-function updateStats(){
-  document.getElementById("stat-leads").textContent=leads.length+prospects.length;
-  document.getElementById("stat-prospects").textContent=prospects.length;
-  document.getElementById("stat-messaged").textContent=prospects.filter(function(p){return p.stage==="messaged"||p.stage==="replied"||p.stage==="call";}).length;
-  document.getElementById("stat-replies").textContent=prospects.filter(function(p){return p.stage==="replied"||p.stage==="call";}).length;
-}
-
+function regenO(id){var p=prospects.find(function(x){return x.id===id;});p.msg="Hi "+p.name.split(" ")[0]+", saw your team is growing at "+p.company+". We keep IT off your plate - 24/7, no surprises. Worth a quick call?";selectO(id);}
+function updateStats(){document.getElementById("stat-leads").textContent=leads.length+prospects.length;document.getElementById("stat-prospects").textContent=prospects.length;document.getElementById("stat-messaged").textContent=prospects.filter(function(p){return p.stage==="messaged"||p.stage==="replied"||p.stage==="call";}).length;document.getElementById("stat-replies").textContent=prospects.filter(function(p){return p.stage==="replied"||p.stage==="call";}).length;}
 function toggleTag(el){el.classList.toggle("on");}
 function toggleEl(el){el.classList.toggle("on");}
-function showPage(name){
-  document.querySelectorAll(".page").forEach(function(p){p.classList.remove("active");});
-  document.querySelectorAll(".nav-tab").forEach(function(t){t.classList.remove("active");});
-  document.getElementById("page-"+name).classList.add("active");
-  var tabs={find:0,prospects:1,research:2,outreach:3,settings:4};
-  document.querySelectorAll(".nav-tab")[tabs[name]].classList.add("active");
-  if(name==="prospects")renderProspects();
-  if(name==="research")renderRL();
-  if(name==="outreach")renderOutreach();
-}
+function showPage(name){document.querySelectorAll(".page").forEach(function(p){p.classList.remove("active");});document.querySelectorAll(".nav-tab").forEach(function(t){t.classList.remove("active");});document.getElementById("page-"+name).classList.add("active");var tabs={find:0,prospects:1,research:2,outreach:3,settings:4};document.querySelectorAll(".nav-tab")[tabs[name]].classList.add("active");if(name==="prospects")renderProspects();if(name==="research")renderRL();if(name==="outreach")renderOutreach();}
 function toast(msg){var t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._to);t._to=setTimeout(function(){t.classList.remove("show");},3000);}
-
-initTitles();
-</script>
-</body>
-</html>
+initTitles();</script></body></html>
