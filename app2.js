@@ -309,6 +309,7 @@ function renderLeads(){
       +"<td>"+li+"</td>"
       +"<td>"+eb+"</td>"
       +"<td><div class='action-btns'>"+ab+ib+"</div></td></tr>";
+    // Column order: Name | Company | Co.Location | Size | LinkedIn | Email | Actions
   }
   tb.innerHTML=rows;
   document.getElementById("leads-shown").textContent=leads.length;
