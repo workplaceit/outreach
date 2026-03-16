@@ -3,6 +3,7 @@ var APOLLO_KEY="4j1OoTcIhPejsI-YMmnaqA";
 var COLORS=["#29abe2","#0ea5e9","#0d9488","#7c3aed","#db2777","#ea580c"];
 var leads=[],prospects=[],sel=new Set(),activeR=null,cModes={},curPage=1,totalLeads=0;
 var titleTags=["CEO","CTO","VP"];
+var listAccountIds=[];  // account domain names from a selected list
 
 function gc(i){return COLORS[i%COLORS.length];}
 
@@ -18,9 +19,7 @@ function renderTitleTags(){
   });
   w.innerHTML=h;
 }
-
 function removeTitle(i){titleTags.splice(i,1);renderTitleTags();}
-
 function initTitles(){
   renderTitleTags();
   var inp=document.getElementById("titles-inp");
@@ -43,39 +42,126 @@ function initTitles(){
 
 // ── APOLLO LISTS ──────────────────────────────────────────────────
 async function loadApolloLists(){
-  var sel = document.getElementById("f-list");
-  if(!sel) return;
-  try {
-    var res = await fetch(PROXY+"/apollo/labels", {
-      headers:{"X-Apollo-Key":APOLLO_KEY}
-    });
-    var data = await res.json();
-    var arr = Array.isArray(data) ? data : Object.values(data);
-    sel.innerHTML = '<option value="">— No list filter —</option>';
+  var sel=document.getElementById("f-list");
+  if(!sel)return;
+  try{
+    var res=await fetch(PROXY+"/apollo/labels",{headers:{"X-Apollo-Key":APOLLO_KEY}});
+    var data=await res.json();
+    var arr=Array.isArray(data)?data:Object.values(data);
+    sel.innerHTML='<option value="">— No list filter —</option>';
     arr.forEach(function(l){
-      var opt = document.createElement("option");
-      opt.value = l._id;
-      opt.textContent = l.name + " (" + (l.cached_count||0).toLocaleString() + ")";
+      var opt=document.createElement("option");
+      opt.value=l._id;
+      opt.textContent=l.name+" ("+(l.cached_count||0).toLocaleString()+")";
       sel.appendChild(opt);
     });
-    if(!arr.length){
-      sel.innerHTML = '<option value="">No lists found</option>';
-    }
-  } catch(e) {
-    sel.innerHTML = '<option value="">Error loading lists</option>';
-    console.log("Lists error:", e.message);
+    if(!arr.length)sel.innerHTML='<option value="">No lists found</option>';
+  }catch(e){
+    sel.innerHTML='<option value="">Error loading lists</option>';
   }
 }
 
-// ── APOLLO SEARCH ──────────────────────────────────────────────────
-async function runSearch(page){
+// ── LOAD LIST ACCOUNTS (free, no credits) ────────────────────────
+async function loadListAccounts(){
+  var listId=document.getElementById("f-list").value;
+  if(!listId){
+    // No list selected — hide accounts panel, show normal search
+    document.getElementById("accounts-panel").style.display="none";
+    document.getElementById("leads-table-wrap").style.display="";
+    document.getElementById("leads-toolbar").style.display="";
+    listAccountIds=[];
+    return;
+  }
+
+  var pp=parseInt(document.getElementById("f-perpage").value)||50;
+  var panel=document.getElementById("accounts-panel");
+  panel.style.display="";
+  panel.innerHTML='<div class="loading-bar"><div class="spinner"></div>Loading companies from list (free - no credits used)...</div>';
+  document.getElementById("leads-table-wrap").style.display="none";
+  document.getElementById("leads-toolbar").style.display="none";
+  document.getElementById("leads-error").innerHTML="";
+
+  try{
+    var res=await fetch(PROXY+"/apollo/accounts/search",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","X-Apollo-Key":APOLLO_KEY},
+      body:JSON.stringify({page:curPage,per_page:pp,label_ids:[listId]})
+    });
+    var data=await res.json();
+    if(!data.accounts){
+      panel.innerHTML='<div class="error-box">Error loading accounts: '+(data.message||"Unknown error")+"</div>";
+      return;
+    }
+
+    var accounts=data.accounts;
+    var total=data.pagination?data.pagination.total_entries:accounts.length;
+    listAccountIds=accounts.map(function(a){return a.id;});
+
+    var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">'
+      +'<div style="font-size:13px;font-weight:600;color:var(--text2)">Showing <span style="color:var(--cyan)">'+accounts.length+'</span> of <span style="color:var(--cyan)">'+total.toLocaleString()+'</span> companies — <span style="color:var(--green);font-weight:700">No credits used</span></div>'
+      +'<button class="btn btn-primary btn-sm" onclick="searchContactsInAccounts()">Search Contacts at These Companies &rarr;</button>'
+      +'</div>';
+
+    html+='<div class="leads-table-wrap"><table class="leads-table">'
+      +'<thead><tr><th>Company</th><th>Industry</th><th>Size</th><th>Location</th><th>Phone</th><th>LinkedIn</th></tr></thead>'
+      +'<tbody>';
+
+    accounts.forEach(function(a){
+      var location=[a.city,a.state,a.country].filter(Boolean).join(", ");
+      var size=a.estimated_num_employees?a.estimated_num_employees.toLocaleString()+" emp":"—";
+      var li=a.linkedin_url?'<a href="'+a.linkedin_url+'" target="_blank" style="color:var(--cyan)">View</a>':"—";
+      var phone=a.phone||"—";
+      html+="<tr>"
+        +"<td><div class=lead-name><a href='"+(a.website_url||"#")+"' target='_blank' style='color:var(--cyan)'>"+a.name+"</a></div></td>"
+        +"<td style='font-size:12px'>"+(a.industry||"—")+"</td>"
+        +"<td>"+size+"</td>"
+        +"<td>"+(location||"—")+"</td>"
+        +"<td style='font-size:12px'>"+phone+"</td>"
+        +"<td>"+li+"</td>"
+        +"</tr>";
+    });
+
+    html+="</tbody></table></div>";
+
+    // Pagination
+    if(data.pagination){
+      var pages=Math.ceil(total/pp);
+      html+='<div class="pagination">Page '+curPage+' of '+pages.toLocaleString()+'&nbsp;';
+      if(curPage>1)html+='<a onclick="curPage--;loadListAccounts()">&larr; Prev</a>&nbsp;';
+      if(curPage<pages)html+='<a onclick="curPage++;loadListAccounts()">Next &rarr;</a>';
+      html+='</div>';
+    }
+
+    panel.innerHTML=html;
+    toast("Loaded "+accounts.length+" companies — no credits used");
+
+  }catch(e){
+    panel.innerHTML='<div class="error-box">Error: '+e.message+"</div>";
+  }
+}
+
+// ── SEARCH CONTACTS AT SELECTED ACCOUNTS (uses credits) ──────────
+async function searchContactsInAccounts(){
+  if(!listAccountIds.length){toast("No companies loaded");return;}
+  document.getElementById("accounts-panel").style.display="none";
+  document.getElementById("leads-table-wrap").style.display="";
+  document.getElementById("leads-toolbar").style.display="";
+  curPage=1;
+  await runSearch(1, listAccountIds);
+}
+
+// ── APOLLO PEOPLE SEARCH ──────────────────────────────────────────
+async function runSearch(page, accountIds){
   curPage=page||1;
   var tbody=document.getElementById("leads-tbody");
-  tbody.innerHTML="<tr><td colspan=7><div class=loading-bar><div class=spinner></div>Searching Apollo...</div></td></tr>";
+  tbody.innerHTML="<tr><td colspan=7><div class=loading-bar><div class=spinner></div>Searching Apollo for contacts...</div></td></tr>";
   document.getElementById("leads-error").innerHTML="";
+  document.getElementById("leads-table-wrap").style.display="";
+  document.getElementById("leads-toolbar").style.display="";
+  document.getElementById("accounts-panel").style.display="none";
+
   var loc=document.getElementById("f-location").value;
   var ind=document.getElementById("f-industry").value;
-  var listId=document.getElementById("f-list").value;
   var pp=parseInt(document.getElementById("f-perpage").value);
   var sen=Array.from(document.querySelectorAll(".filter-tag.on")).map(function(t){
     return t.textContent.toLowerCase().replace(/-/g,"_").replace("c_level","c_suite");
@@ -88,7 +174,9 @@ async function runSearch(page){
   };
   if(titleTags.length)body.person_titles=titleTags;
   if(ind)body.q_organization_keyword_tags=[ind];
-  if(listId)body.label_ids=[listId];
+  // If searching within specific accounts from a list
+  if(accountIds&&accountIds.length)body.account_ids=accountIds;
+
   try{
     var res=await fetch(PROXY+"/apollo/mixed_people/search",{
       method:"POST",
@@ -97,7 +185,7 @@ async function runSearch(page){
     });
     var data=await res.json();
     if(data.error||!data.people){
-      document.getElementById("leads-error").innerHTML="<div class=error-box>Apollo error: "+(data.error||data.message||"Unknown")+"</div>";
+      document.getElementById("leads-error").innerHTML='<div class="error-box">Apollo error: '+(data.error||data.message||"Unknown")+"</div>";
       tbody.innerHTML="";return;
     }
     leads.length=0;
@@ -116,9 +204,9 @@ async function runSearch(page){
     });
     totalLeads=data.pagination?data.pagination.total_entries:leads.length;
     renderLeads();renderPagination(data.pagination,pp);
-    toast("Found "+totalLeads.toLocaleString()+" leads from Apollo");
+    toast("Found "+totalLeads.toLocaleString()+" contacts");
   }catch(e){
-    document.getElementById("leads-error").innerHTML="<div class=error-box>Error: "+e.message+"</div>";
+    document.getElementById("leads-error").innerHTML='<div class="error-box">Error: '+e.message+"</div>";
     tbody.innerHTML="";
   }
 }
@@ -141,14 +229,14 @@ function renderPagination(pag,pp){
 function renderLeads(){
   var tb=document.getElementById("leads-tbody");
   if(!leads.length){
-    tb.innerHTML="<tr><td colspan=7><div class=loading-bar>No leads found. Try adjusting filters.</div></td></tr>";
+    tb.innerHTML='<tr><td colspan="7"><div class="loading-bar">No contacts found. Try adjusting filters.</div></td></tr>';
     return;
   }
   var rows="";
   for(var i=0;i<leads.length;i++){
     var l=leads[i];
     var chk='<input type=checkbox '+(sel.has(l.id)?"checked ":"")+'onchange="toggleL(\''+l.id+'\',this.checked)"/>';
-    var avatar='<div class=avatar style="background:'+gc(i)+'">'+l.av+"</div>";
+    var avatar='<div class="avatar" style="background:'+gc(i)+'">'+l.av+"</div>";
     var emailBadge=l.email
       ?'<span style="display:inline-flex;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;background:#dcfce7;color:#15803d">'+l.email+"</span>"
       :'<span style="display:inline-flex;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;background:#fef9c3;color:#854d0e">Not available</span>';
@@ -158,13 +246,13 @@ function renderLeads(){
       +'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-width="2"/></svg></div>';
     rows+="<tr>"
       +"<td>"+chk+"</td>"
-      +'<td><div class=lead-name-cell>'+avatar
-        +'<div><div class=lead-name>'+l.name+'</div><div class=lead-sub>'+l.title+"</div></div></div></td>"
+      +'<td><div class="lead-name-cell">'+avatar
+        +'<div><div class="lead-name">'+l.name+'</div><div class="lead-sub">'+l.title+"</div></div></div></td>"
       +"<td>"+(l.company||"-")+"</td>"
       +"<td>"+(l.size||"-")+"</td>"
       +"<td>"+(l.location||"-")+"</td>"
       +"<td>"+emailBadge+"</td>"
-      +'<td><div class=action-btns>'+addBtn+ignBtn+"</div></td>"
+      +'<td><div class="action-btns">'+addBtn+ignBtn+"</div></td>"
       +"</tr>";
   }
   tb.innerHTML=rows;
@@ -175,7 +263,6 @@ function renderLeads(){
 
 function toggleL(id,on){on?sel.add(id):sel.delete(id);}
 function selectAll(cb){leads.forEach(function(l){cb.checked?sel.add(l.id):sel.delete(l.id);});renderLeads();}
-
 function addP(id){
   var l=leads.find(function(x){return x.id===id;});
   if(!l||prospects.find(function(p){return p.id===id;}))return;
@@ -200,25 +287,25 @@ function renderProspects(filter){
   }
   var html="";
   list.forEach(function(p,i){
-    html+='<div class=prospect-card><div class=p-card-hdr>'
-      +'<div class=avatar style="background:'+gc(i)+';width:44px;height:44px;font-size:14px;position:relative">'+p.av+"</div>"
-      +'<div style=position:relative>'
-        +'<div class=p-name>'+p.name+"</div>"
-        +'<div class=p-role>'+p.title+"</div>"
-        +'<div class=p-co>'+p.company+"</div>"
+    html+='<div class="prospect-card"><div class="p-card-hdr">'
+      +'<div class="avatar" style="background:'+gc(i)+';width:44px;height:44px;font-size:14px;position:relative">'+p.av+"</div>"
+      +'<div style="position:relative">'
+        +'<div class="p-name">'+p.name+"</div>"
+        +'<div class="p-role">'+p.title+"</div>"
+        +'<div class="p-co">'+p.company+"</div>"
       +"</div>"
       +'<span class="stage-badge s'+p.stage[0]+'" style="margin-left:auto;position:relative">'+sName(p.stage)+"</span>"
       +"</div>"
-      +'<div class=prospect-body>'
-        +'<div class=prospect-meta>'
-          +'<div class=meta-chip>'+(p.size||"")+"</div>"
-          +'<div class=meta-chip>'+(p.location||"")+"</div>"
-          +(p.email?'<div class=meta-chip>'+p.email+"</div>":"")
+      +'<div class="prospect-body">'
+        +'<div class="prospect-meta">'
+          +'<div class="meta-chip">'+(p.size||"")+"</div>"
+          +'<div class="meta-chip">'+(p.location||"")+"</div>"
+          +(p.email?'<div class="meta-chip">'+p.email+"</div>":"")
         +"</div>"
         +(p.aiS
-          ?'<div class=ai-box><strong>AI: </strong>'+p.aiS+"</div>"
-          :'<div class=ai-box style="color:var(--gray3);border-left-color:var(--gray3)">AI research not yet run</div>')
-        +'<div class=prospect-actions>'
+          ?'<div class="ai-box"><strong>AI: </strong>'+p.aiS+"</div>"
+          :'<div class="ai-box" style="color:var(--gray3);border-left-color:var(--gray3)">AI research not yet run</div>')
+        +'<div class="prospect-actions">'
           +'<button class="btn btn-primary btn-sm" onclick="goR(\''+p.id+'\')">Research</button>'
           +'<button class="btn btn-outline btn-sm" onclick="goO(\''+p.id+'\')">Outreach</button>'
           +'<button class="btn btn-ghost btn-sm" onclick="nextStage(\''+p.id+'\')">Next Stage</button>'
@@ -240,34 +327,32 @@ function renderRL(){
   var html="";
   prospects.forEach(function(p,i){
     html+='<div class="r-item '+(activeR===p.id?"active":"")+'" onclick="selectR(\''+p.id+'\')">'
-      +'<div class=avatar style="background:'+gc(i)+';width:34px;height:34px;font-size:12px;flex-shrink:0">'+p.av+"</div>"
-      +'<div><div class=r-item-name>'+p.name+(p.aiS?" ✓":"")+"</div>"
-      +'<div class=r-item-co>'+p.company+"</div></div></div>";
+      +'<div class="avatar" style="background:'+gc(i)+';width:34px;height:34px;font-size:12px;flex-shrink:0">'+p.av+"</div>"
+      +'<div><div class="r-item-name">'+p.name+(p.aiS?" ✓":"")+"</div>"
+      +'<div class="r-item-co">'+p.company+"</div></div></div>";
   });
   document.getElementById("r-list-items").innerHTML=html;
 }
-
 function selectR(id){
   activeR=id;renderRL();
   var p=prospects.find(function(x){return x.id===id;});
   if(p.aiS){showRResult(p);return;}
   document.getElementById("r-pane").innerHTML=
-    '<div class=r-card><div class=r-card-top>'
-    +'<div class=avatar style="background:'+gc(prospects.indexOf(p))+';width:52px;height:52px;font-size:17px;position:relative">'+p.av+"</div>"
-    +'<div style=position:relative>'
+    '<div class="r-card"><div class="r-card-top">'
+    +'<div class="avatar" style="background:'+gc(prospects.indexOf(p))+';width:52px;height:52px;font-size:17px;position:relative">'+p.av+"</div>"
+    +'<div style="position:relative">'
       +'<div style="font-size:18px;font-weight:800;color:#fff">'+p.name+"</div>"
       +'<div style="font-size:13px;color:#a0b4cc">'+p.title+" at "+p.company+"</div>"
     +"</div></div>"
-    +'<div class=r-card-body>'
-      +'<div class=ai-load><div class=dot-pulse><span></span><span></span><span></span></div>Ready to research '+p.name+"</div>"
+    +'<div class="r-card-body">'
+      +'<div class="ai-load"><div class="dot-pulse"><span></span><span></span><span></span></div>Ready to research '+p.name+"</div>"
       +'<button class="btn btn-primary" style="margin-top:12px" onclick="runR(\''+p.id+'\')">Run AI Research Now</button>'
     +"</div></div>";
 }
-
 function runR(id){
   var p=prospects.find(function(x){return x.id===id;});
   var ld=document.querySelector(".ai-load");
-  if(ld)ld.innerHTML='<div class=dot-pulse><span></span><span></span><span></span></div> Analyzing...';
+  if(ld)ld.innerHTML='<div class="dot-pulse"><span></span><span></span><span></span></div> Analyzing...';
   setTimeout(function(){
     p.aiS=p.company+" is growing and likely has IT infrastructure needs. "+p.name+" is a key decision-maker worth a personalized outreach.";
     p.insights=[
@@ -285,25 +370,23 @@ function runR(id){
     toast("AI research complete for "+p.name);
   },2000);
 }
-
 function showRResult(p){
-  var html='<div class=r-card><div class=r-card-top>'
-    +'<div class=avatar style="background:'+gc(prospects.indexOf(p))+';width:52px;height:52px;font-size:17px;position:relative">'+p.av+"</div>"
-    +'<div style=position:relative>'
+  var html='<div class="r-card"><div class="r-card-top">'
+    +'<div class="avatar" style="background:'+gc(prospects.indexOf(p))+';width:52px;height:52px;font-size:17px;position:relative">'+p.av+"</div>"
+    +'<div style="position:relative">'
       +'<div style="font-size:18px;font-weight:800;color:#fff">'+p.name+"</div>"
       +'<div style="font-size:13px;color:#a0b4cc">'+p.title+" at "+p.company+"</div>"
       +(p.email?'<div style="font-size:12px;color:#29abe2;margin-top:2px">'+p.email+"</div>":"")
     +"</div>"
     +'<button class="btn btn-primary btn-sm" style="margin-left:auto;position:relative" onclick="goO(\''+p.id+'\')">Compose Outreach</button>'
     +"</div>"
-    +'<div class=r-card-body>'
-      +'<div class=r-section><h3>AI Insights</h3>';
+    +'<div class="r-card-body"><div class="r-section"><h3>AI Insights</h3>';
   (p.insights||[]).forEach(function(ins){
-    html+='<div class=r-insight><span style="margin-right:6px;color:#29abe2">&#10022;</span><span>'+ins.t+"</span></div>";
+    html+='<div class="r-insight"><span style="margin-right:6px;color:#29abe2">&#10022;</span><span>'+ins.t+"</span></div>";
   });
   html+="</div>"
-    +'<div class=r-section><h3>Suggested LinkedIn Message</h3>'
-      +'<div class=msg-box><p>'+p.msg+"</p></div>"
+    +'<div class="r-section"><h3>Suggested LinkedIn Message</h3>'
+      +'<div class="msg-box"><p>'+p.msg+"</p></div>"
       +'<div style="display:flex;gap:8px;margin-top:10px">'
         +'<button class="btn btn-primary btn-sm" onclick="goO(\''+p.id+'\')">Use This Message</button>'
         +'<button class="btn btn-ghost btn-sm" onclick="regenR(\''+p.id+'\')">Regenerate</button>'
@@ -312,7 +395,6 @@ function showRResult(p){
   +"</div></div>";
   document.getElementById("r-pane").innerHTML=html;
 }
-
 function runAllResearch(){
   prospects.filter(function(p){return !p.aiS;}).forEach(function(p){
     selectR(p.id);setTimeout(function(){runR(p.id);},200);
@@ -325,56 +407,54 @@ function regenR(id){var p=prospects.find(function(x){return x.id===id;});p.aiS=n
 function renderOutreach(){
   var html="";
   prospects.forEach(function(p,i){
-    html+='<div class=o-item onclick="selectO(\''+p.id+'\')">'
-      +'<div class=avatar style="background:'+gc(i)+';width:36px;height:36px;font-size:12px;flex-shrink:0">'+p.av+"</div>"
-      +'<div class=o-item-info>'
-        +'<div class=o-item-name>'+p.name+"</div>"
-        +'<div class=o-item-prev>'+(p.msg?p.msg.substring(0,50)+"...":"No message yet")+"</div>"
+    html+='<div class="o-item" onclick="selectO(\''+p.id+'\')">'
+      +'<div class="avatar" style="background:'+gc(i)+';width:36px;height:36px;font-size:12px;flex-shrink:0">'+p.av+"</div>"
+      +'<div class="o-item-info">'
+        +'<div class="o-item-name">'+p.name+"</div>"
+        +'<div class="o-item-prev">'+(p.msg?p.msg.substring(0,50)+"...":"No message yet")+"</div>"
       +"</div></div>";
   });
   document.getElementById("o-items").innerHTML=html;
   document.getElementById("o-count").textContent=prospects.length;
 }
-
 function selectO(id){
   var p=prospects.find(function(x){return x.id===id;});
   var mode=cModes[id]||"linkedin";
-  var html='<div class=compose-card>'
-    +'<div class=c-hdr>'
-      +'<div class=c-hdr-title>'
-        +'<div class=avatar style="background:'+gc(prospects.indexOf(p))+';width:28px;height:28px;font-size:11px">'+p.av+"</div>"
+  var html='<div class="compose-card">'
+    +'<div class="c-hdr">'
+      +'<div class="c-hdr-title">'
+        +'<div class="avatar" style="background:'+gc(prospects.indexOf(p))+';width:28px;height:28px;font-size:11px">'+p.av+"</div>"
         +p.name+" - "+p.company
       +"</div>"
-      +'<div class=c-tabs>'
+      +'<div class="c-tabs">'
         +'<div class="c-tab '+(mode==="linkedin"?"active":"")+'" onclick="setMode(\''+p.id+'\',\'linkedin\')">LinkedIn</div>'
         +'<div class="c-tab '+(mode==="email"?"active":"")+'" onclick="setMode(\''+p.id+'\',\'email\')">Email</div>'
       +"</div>"
     +"</div>"
-    +'<div class=c-body>'
-      +(mode==="email"?'<input class=filter-input placeholder="Subject..." style="margin-bottom:8px" value="Re: '+p.company+'"/>':"")
-      +'<textarea class=c-textarea id="msg-'+p.id+'" oninput="updCC(\''+p.id+'\')">'+(p.msg||"")+"</textarea>"
+    +'<div class="c-body">'
+      +(mode==="email"?'<input class="filter-input" placeholder="Subject..." style="margin-bottom:8px" value="Re: '+p.company+'"/>':"")
+      +'<textarea class="c-textarea" id="msg-'+p.id+'" oninput="updCC(\''+p.id+'\')">'+(p.msg||"")+"</textarea>"
     +"</div>"
-    +'<div class=c-footer>'
-      +'<span class=char-count id="cc-'+p.id+'">'+(p.msg||"").length+" chars"+(mode==="linkedin"?" / 300 limit":"")+"</span>"
+    +'<div class="c-footer">'
+      +'<span class="char-count" id="cc-'+p.id+'">'+(p.msg||"").length+" chars"+(mode==="linkedin"?" / 300 limit":"")+"</span>"
       +'<div style="display:flex;gap:8px">'
         +'<button class="btn btn-ghost btn-sm" onclick="regenO(\''+p.id+'\')">Regenerate</button>'
         +'<button class="btn btn-primary btn-sm" onclick="sendO(\''+p.id+'\',\''+mode+'\')">'+(mode==="linkedin"?"Open LinkedIn":"Send Email")+"</button>"
       +"</div>"
     +"</div>"
   +"</div>"
-  +'<div class=seq-card>'
-    +'<div class=c-hdr style="padding:12px 18px">'
-      +'<div class=c-hdr-title style="font-size:13px">Follow-up Sequence</div>'
+  +'<div class="seq-card">'
+    +'<div class="c-hdr" style="padding:12px 18px">'
+      +'<div class="c-hdr-title" style="font-size:13px">Follow-up Sequence</div>'
       +'<button class="btn btn-outline btn-sm">+ Add Step</button>'
     +"</div>"
-    +'<div class=seq-item><div class=seq-num>1</div><div style=flex:1>LinkedIn intro<br><span style="font-size:11px;color:var(--text2)">Day 1 - Manual</span></div>'
+    +'<div class="seq-item"><div class="seq-num">1</div><div style="flex:1">LinkedIn intro<br><span style="font-size:11px;color:var(--text2)">Day 1 - Manual</span></div>'
       +'<span class="badge '+(p.stage==="messaged"||p.stage==="replied"?"badge-verified":"badge-pending")+'">'+(p.stage==="messaged"||p.stage==="replied"?"Sent":"Pending")+"</span></div>"
-    +'<div class=seq-item><div class=seq-num>2</div><div style=flex:1>Follow-up email<br><span style="font-size:11px;color:var(--text2)">Day 4 - Office 365</span></div><span class="badge badge-pending">Pending</span></div>'
-    +'<div class=seq-item><div class=seq-num>3</div><div style=flex:1>Soft close<br><span style="font-size:11px;color:var(--text2)">Day 10 - Office 365</span></div><span class="badge badge-pending">Pending</span></div>'
+    +'<div class="seq-item"><div class="seq-num">2</div><div style="flex:1">Follow-up email<br><span style="font-size:11px;color:var(--text2)">Day 4 - Office 365</span></div><span class="badge badge-pending">Pending</span></div>'
+    +'<div class="seq-item"><div class="seq-num">3</div><div style="flex:1">Soft close<br><span style="font-size:11px;color:var(--text2)">Day 10 - Office 365</span></div><span class="badge badge-pending">Pending</span></div>'
   +"</div>";
   document.getElementById("o-pane").innerHTML=html;
 }
-
 function setMode(id,m){cModes[id]=m;selectO(id);}
 function updCC(id){var ta=document.getElementById("msg-"+id);var cc=document.getElementById("cc-"+id);if(ta&&cc)cc.textContent=ta.value.length+" chars";}
 function sendO(id,mode){
