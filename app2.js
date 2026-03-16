@@ -4,7 +4,7 @@ var COLORS=["#29abe2","#0ea5e9","#0d9488","#7c3aed","#db2777","#ea580c"];
 var leads=[],prospects=[],sel=new Set(),activeR=null,cModes={},curPage=1,totalLeads=0;
 var titleTags=["CEO","CTO","VP"];
 var listAccountIds=[];
-var listModality={}; // stores modality per list id
+var listModality={};
 
 function gc(i){return COLORS[i%COLORS.length];}
 
@@ -43,33 +43,34 @@ function initTitles(){
 
 // ── LOAD LISTS ────────────────────────────────────────────────────
 async function loadApolloLists(){
-  var sel=document.getElementById("f-list");
-  if(!sel)return;
+  var s=document.getElementById("f-list");
+  if(!s)return;
   try{
     var res=await fetch(PROXY+"/apollo/labels",{headers:{"X-Apollo-Key":APOLLO_KEY}});
     var data=await res.json();
     var arr=Array.isArray(data)?data:Object.values(data);
-    sel.innerHTML='<option value="">— No list filter —</option>';
+    s.innerHTML='<option value="">— No list filter —</option>';
     arr.forEach(function(l){
       listModality[l._id]=l.modality;
       var opt=document.createElement("option");
       opt.value=l._id;
       opt.textContent=l.name+" ("+(l.cached_count||0).toLocaleString()+") - "+(l.modality==="contacts"?"People":"Companies");
-      sel.appendChild(opt);
+      s.appendChild(opt);
     });
-    if(!arr.length)sel.innerHTML='<option value="">No lists found</option>';
+    if(!arr.length)s.innerHTML='<option value="">No lists found</option>';
   }catch(e){
-    sel.innerHTML='<option value="">Error loading lists</option>';
+    s.innerHTML='<option value="">Error loading lists</option>';
   }
 }
 
-// ── LOAD LIST COMPANIES (free, no credits) ────────────────────────
+// ── LIST SELECTION HANDLER ────────────────────────────────────────
 async function loadListAccounts(){
   var listId=document.getElementById("f-list").value;
   var panel=document.getElementById("accounts-panel");
   var tableWrap=document.getElementById("leads-table-wrap");
   var toolbar=document.getElementById("leads-toolbar");
 
+  // No list selected — reset to normal view
   if(!listId){
     panel.style.display="none";
     tableWrap.style.display="";
@@ -78,8 +79,9 @@ async function loadListAccounts(){
     return;
   }
 
-  // If it's a people/contacts list — load directly into the leads table (no credits)
   var modality=listModality[listId]||"contacts";
+
+  // People list — load contacts directly, no credits
   if(modality==="contacts"){
     panel.style.display="none";
     tableWrap.style.display="";
@@ -88,7 +90,7 @@ async function loadListAccounts(){
     return;
   }
 
-  // Otherwise it's an accounts list — show companies for free
+  // Account/company list — show companies free, offer to search contacts
   var pp=parseInt(document.getElementById("f-perpage").value)||50;
   panel.style.display="";
   panel.innerHTML='<div class="loading-bar"><div class="spinner"></div>Loading companies from list — no credits used...</div>';
@@ -114,17 +116,16 @@ async function loadListAccounts(){
     var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">'
       +'<div class="leads-count">Showing <span style="color:var(--cyan)">'+accounts.length+'</span> of <span style="color:var(--cyan)">'+total.toLocaleString()+'</span> companies &mdash; <span style="color:var(--green);font-weight:700">No credits used</span></div>'
       +'<button class="btn btn-primary btn-sm" onclick="searchContactsInAccounts()">Search Contacts at These Companies &rarr;</button>'
-      +'</div>';
-
-    html+='<div class="leads-table-wrap"><table class="leads-table">'
+      +'</div>'
+      +'<div class="leads-table-wrap"><table class="leads-table">'
       +'<thead><tr><th>Company</th><th>Industry</th><th>Size</th><th>Location</th><th>Phone</th><th>LinkedIn</th></tr></thead><tbody>';
 
     accounts.forEach(function(a){
       var loc=[a.city,a.state,a.country].filter(Boolean).join(", ");
       var size=a.estimated_num_employees?a.estimated_num_employees.toLocaleString()+" emp":"—";
-      var li=a.linkedin_url?'<a href="'+a.linkedin_url+'" target="_blank" style="color:var(--cyan)">View</a>':"—";
+      var li=a.linkedin_url?'<a href="'+a.linkedin_url+'" target="_blank" style="color:var(--cyan)">View ↗</a>':"—";
       html+="<tr>"
-        +'<td><div class="lead-name"><a href="'+(a.website_url||"#")+'" target="_blank" style="color:var(--cyan)">'+a.name+"</a></div></td>"
+        +'<td><a href="'+(a.website_url||"#")+'" target="_blank" style="color:var(--cyan);font-weight:600">'+a.name+"</a></td>"
         +'<td style="font-size:12px">'+(a.industry||"—")+"</td>"
         +"<td>"+size+"</td>"
         +"<td>"+(loc||"—")+"</td>"
@@ -148,14 +149,14 @@ async function loadListAccounts(){
   }
 }
 
-// ── LOAD PEOPLE LIST (no credits — already saved contacts) ────────
+// ── LOAD PEOPLE LIST (no credits) ────────────────────────────────
 async function loadPeopleList(listId){
   var pp=parseInt(document.getElementById("f-perpage").value)||50;
   var tbody=document.getElementById("leads-tbody");
-  tbody.innerHTML='<tr><td colspan="7"><div class="loading-bar"><div class="spinner"></div>Loading saved contacts from list — no credits used...</div></td></tr>';
-  document.getElementById("leads-error").innerHTML="";
   document.getElementById("leads-shown").textContent="0";
   document.getElementById("leads-total").textContent="0";
+  document.getElementById("leads-error").innerHTML="";
+  tbody.innerHTML='<tr><td colspan="8"><div class="loading-bar"><div class="spinner"></div>Loading saved contacts — no credits used...</div></td></tr>';
 
   try{
     var res=await fetch(PROXY+"/apollo/contacts/search",{
@@ -164,21 +165,22 @@ async function loadPeopleList(listId){
       body:JSON.stringify({page:curPage,per_page:pp,label_ids:[listId]})
     });
     var data=await res.json();
-    if(!data.contacts&&!data.people){
-      document.getElementById("leads-error").innerHTML='<div class="error-box">Error: '+(data.message||"Could not load contacts")+"</div>";
+    var people=data.contacts||data.people||[];
+    if(!people.length&&data.message){
+      document.getElementById("leads-error").innerHTML='<div class="error-box">Error: '+data.message+"</div>";
       tbody.innerHTML="";return;
     }
-    var people=data.contacts||data.people||[];
     leads.length=0;
     people.forEach(function(p){
+      var acct=p.account||{};
       leads.push({
         id:p.id,
         name:(p.first_name||"")+" "+(p.last_name||""),
         title:p.title||"",
-        company:p.organization_name||p.account_name||(p.account?p.account.name:"")||"",
-        size:"",
+        company:p.organization_name||acct.name||"",
+        coLocation:[acct.city,acct.state].filter(Boolean).join(", ")||"",
+        size:acct.estimated_num_employees?fmtSz(acct.estimated_num_employees):"",
         location:[p.city,p.state].filter(Boolean).join(", ")||p.country||"",
-        coLocation:[p.account?p.account.city:null,p.account?p.account.state:null].filter(Boolean).join(", ")||"",
         email:p.email||"",
         li:p.linkedin_url||"",
         av:((p.first_name||"?")[0]+(p.last_name||"?")[0]).toUpperCase()
@@ -187,12 +189,14 @@ async function loadPeopleList(listId){
     totalLeads=data.pagination?data.pagination.total_entries:leads.length;
     renderLeads();
     renderPagination(data.pagination,pp);
-    toast("Loaded "+leads.length+" contacts from list — no credits used");
+    toast("Loaded "+leads.length+" contacts — no credits used");
   }catch(e){
     document.getElementById("leads-error").innerHTML='<div class="error-box">Error: '+e.message+"</div>";
     tbody.innerHTML="";
   }
 }
+
+// ── SEARCH CONTACTS IN ACCOUNT LIST (uses credits) ────────────────
 async function searchContactsInAccounts(){
   if(!listAccountIds.length){toast("No companies loaded");return;}
   document.getElementById("accounts-panel").style.display="none";
@@ -209,7 +213,7 @@ async function runSearch(page,accountIds){
   document.getElementById("leads-table-wrap").style.display="";
   document.getElementById("leads-toolbar").style.display="";
   var tbody=document.getElementById("leads-tbody");
-  tbody.innerHTML='<tr><td colspan="7"><div class="loading-bar"><div class="spinner"></div>Searching Apollo for contacts...</div></td></tr>';
+  tbody.innerHTML='<tr><td colspan="8"><div class="loading-bar"><div class="spinner"></div>Searching Apollo for contacts...</div></td></tr>';
   document.getElementById("leads-error").innerHTML="";
 
   var loc=document.getElementById("f-location").value;
@@ -241,12 +245,14 @@ async function runSearch(page,accountIds){
     }
     leads.length=0;
     data.people.forEach(function(p){
+      var org=p.organization||{};
       leads.push({
         id:p.id,
         name:(p.first_name||"")+" "+(p.last_name||""),
         title:p.title||"",
-        company:p.organization?p.organization.name:"",
-        size:p.organization?fmtSz(p.organization.estimated_num_employees):"",
+        company:org.name||"",
+        coLocation:[org.city,org.state].filter(Boolean).join(", ")||"",
+        size:org.estimated_num_employees?fmtSz(org.estimated_num_employees):"",
         location:[p.city,p.state].filter(Boolean).join(", ")||p.country||"",
         email:p.email||"",
         li:p.linkedin_url||"",
@@ -254,7 +260,8 @@ async function runSearch(page,accountIds){
       });
     });
     totalLeads=data.pagination?data.pagination.total_entries:leads.length;
-    renderLeads();renderPagination(data.pagination,pp);
+    renderLeads();
+    renderPagination(data.pagination,pp);
     toast("Found "+totalLeads.toLocaleString()+" contacts from Apollo");
   }catch(e){
     document.getElementById("leads-error").innerHTML='<div class="error-box">Error: '+e.message+"</div>";
@@ -263,23 +270,24 @@ async function runSearch(page,accountIds){
 }
 
 function fmtSz(n){
-  if(!n)return"Unknown";
-  if(n<11)return"1-10 emp";if(n<51)return"11-50 emp";
-  if(n<201)return"51-200 emp";if(n<501)return"201-500 emp";return"500+ emp";
+  if(!n)return"";
+  if(n<11)return"1-10";if(n<51)return"11-50";
+  if(n<201)return"51-200";if(n<501)return"201-500";return"500+";
 }
 function renderPagination(pag,pp){
   if(!pag)return;
   var pages=Math.ceil(pag.total_entries/pp);
   var h="Page "+curPage+" of "+pages.toLocaleString()+"&nbsp;";
-  if(curPage>1)h+='<a onclick="runSearch('+(curPage-1)+',null)">&larr; Prev</a>&nbsp;';
-  if(curPage<pages)h+='<a onclick="runSearch('+(curPage+1)+',null)">Next &rarr;</a>';
+  if(curPage>1)h+='<a onclick="curPage--;runSearch(curPage,null)">&larr; Prev</a>&nbsp;';
+  if(curPage<pages)h+='<a onclick="curPage++;runSearch(curPage,null)">Next &rarr;</a>';
   document.getElementById("pagination").innerHTML=h;
 }
 
+// ── RENDER LEADS TABLE ────────────────────────────────────────────
 function renderLeads(){
   var tb=document.getElementById("leads-tbody");
   if(!leads.length){
-    tb.innerHTML='<tr><td colspan="7"><div class="loading-bar">No contacts found. Try adjusting filters.</div></td></tr>';
+    tb.innerHTML='<tr><td colspan="8"><div class="loading-bar">No contacts found.</div></td></tr>';
     return;
   }
   var rows="";
@@ -287,18 +295,18 @@ function renderLeads(){
     var l=leads[i];
     var chk='<input type="checkbox" '+(sel.has(l.id)?"checked ":"")+'onchange="toggleL(\''+l.id+'\',this.checked)"/>';
     var av='<div class="avatar" style="background:'+gc(i)+'">'+l.av+"</div>";
+    var li=l.li?'<a href="'+l.li+'" target="_blank" style="color:var(--cyan);font-size:12px">View ↗</a>':"—";
     var eb=l.email
       ?'<span style="display:inline-flex;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;background:#dcfce7;color:#15803d">'+l.email+"</span>"
       :'<span style="display:inline-flex;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;background:#fef9c3;color:#854d0e">Not available</span>';
     var ab='<div class="icon-btn add" onclick="addP(\''+l.id+'\')" title="Add"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg></div>';
     var ib='<div class="icon-btn ign" onclick="ignOne(\''+l.id+'\')" title="Ignore"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-width="2"/></svg></div>';
-    var liLink=l.li?'<a href="'+l.li+'" target="_blank" style="color:var(--cyan);font-size:12px">View ↗</a>':"—";
     rows+="<tr><td>"+chk+"</td>"
       +'<td><div class="lead-name-cell">'+av+'<div><div class="lead-name">'+l.name+'</div><div class="lead-sub">'+l.title+"</div></div></div></td>"
-      +"<td>"+(l.company||"-")+"</td>"
-      +"<td style='font-size:12px'>"+(l.coLocation||l.location||"-")+"</td>"
-      +"<td>"+(l.size||"-")+"</td>"
-      +"<td>"+liLink+"</td>"
+      +"<td>"+(l.company||"—")+"</td>"
+      +'<td style="font-size:12px">'+(l.coLocation||"—")+"</td>"
+      +'<td style="font-size:12px">'+(l.size||"—")+"</td>"
+      +"<td>"+li+"</td>"
       +"<td>"+eb+"</td>"
       +"<td><div class='action-btns'>"+ab+ib+"</div></td></tr>";
   }
@@ -337,7 +345,11 @@ function renderProspects(filter){
       +'<div class="avatar" style="background:'+gc(i)+';width:44px;height:44px;font-size:14px;position:relative">'+p.av+"</div>"
       +'<div style="position:relative"><div class="p-name">'+p.name+"</div><div class='p-role'>"+p.title+"</div><div class='p-co'>"+p.company+"</div></div>"
       +'<span class="stage-badge s'+p.stage[0]+'" style="margin-left:auto;position:relative">'+sName(p.stage)+"</span></div>"
-      +'<div class="prospect-body"><div class="prospect-meta"><div class="meta-chip">'+(p.size||"")+"</div><div class='meta-chip'>"+(p.location||"")+"</div>"+(p.email?'<div class="meta-chip">'+p.email+"</div>":"")+"</div>"
+      +'<div class="prospect-body"><div class="prospect-meta">'
+      +'<div class="meta-chip">'+(p.coLocation||p.location||"")+"</div>"
+      +(p.size?'<div class="meta-chip">'+p.size+"</div>":"")
+      +(p.email?'<div class="meta-chip">'+p.email+"</div>":"")
+      +"</div>"
       +(p.aiS?'<div class="ai-box"><strong>AI: </strong>'+p.aiS+"</div>":'<div class="ai-box" style="color:var(--gray3);border-left-color:var(--gray3)">AI research not yet run</div>')
       +'<div class="prospect-actions">'
       +'<button class="btn btn-primary btn-sm" onclick="goR(\''+p.id+'\')">Research</button>'
@@ -384,12 +396,12 @@ function runR(id){
     p.aiS=p.company+" is growing and likely has IT infrastructure needs. "+p.name+" is a key decision-maker worth a personalized outreach.";
     p.insights=[
       {t:p.company+" - decision maker with budget authority"},
-      {t:"Located in "+(p.location||"your area")+" - local relationship opportunity"},
+      {t:"Located in "+(p.coLocation||p.location||"your area")+" - local relationship opportunity"},
       {t:p.email?"Email available: "+p.email:"LinkedIn outreach recommended"},
       {t:"Custom intro message generated below"}
     ];
     p.msg="Hi "+p.name.split(" ")[0]+", I noticed "+p.company+" is growing and wanted to reach out. "
-      +"We help companies in "+(p.location||"your area")+" keep IT completely off their plate - "
+      +"We help companies in "+(p.coLocation||p.location||"your area")+" keep IT completely off their plate - "
       +"24/7 monitoring, no surprises, local team that picks up the phone. "
       +"Would love to show how we have helped similar businesses. Open to a quick 15-min call?";
     p.stage="research";
