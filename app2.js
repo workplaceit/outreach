@@ -4,6 +4,7 @@ var COLORS=["#29abe2","#0ea5e9","#0d9488","#7c3aed","#db2777","#ea580c"];
 var leads=[],prospects=[],sel=new Set(),activeR=null,cModes={},curPage=1,totalLeads=0;
 var titleTags=["CEO","CTO","VP"];
 var listAccountIds=[];
+var listModality={}; // stores modality per list id
 
 function gc(i){return COLORS[i%COLORS.length];}
 
@@ -50,9 +51,10 @@ async function loadApolloLists(){
     var arr=Array.isArray(data)?data:Object.values(data);
     sel.innerHTML='<option value="">— No list filter —</option>';
     arr.forEach(function(l){
+      listModality[l._id]=l.modality;
       var opt=document.createElement("option");
       opt.value=l._id;
-      opt.textContent=l.name+" ("+(l.cached_count||0).toLocaleString()+")";
+      opt.textContent=l.name+" ("+(l.cached_count||0).toLocaleString()+") - "+(l.modality==="contacts"?"People":"Companies");
       sel.appendChild(opt);
     });
     if(!arr.length)sel.innerHTML='<option value="">No lists found</option>';
@@ -76,6 +78,17 @@ async function loadListAccounts(){
     return;
   }
 
+  // If it's a people/contacts list — load directly into the leads table (no credits)
+  var modality=listModality[listId]||"contacts";
+  if(modality==="contacts"){
+    panel.style.display="none";
+    tableWrap.style.display="";
+    toolbar.style.display="";
+    await loadPeopleList(listId);
+    return;
+  }
+
+  // Otherwise it's an accounts list — show companies for free
   var pp=parseInt(document.getElementById("f-perpage").value)||50;
   panel.style.display="";
   panel.innerHTML='<div class="loading-bar"><div class="spinner"></div>Loading companies from list — no credits used...</div>';
@@ -135,7 +148,50 @@ async function loadListAccounts(){
   }
 }
 
-// ── SEARCH CONTACTS IN LIST ACCOUNTS (uses credits) ───────────────
+// ── LOAD PEOPLE LIST (no credits — already saved contacts) ────────
+async function loadPeopleList(listId){
+  var pp=parseInt(document.getElementById("f-perpage").value)||50;
+  var tbody=document.getElementById("leads-tbody");
+  tbody.innerHTML='<tr><td colspan="7"><div class="loading-bar"><div class="spinner"></div>Loading saved contacts from list — no credits used...</div></td></tr>';
+  document.getElementById("leads-error").innerHTML="";
+  document.getElementById("leads-shown").textContent="0";
+  document.getElementById("leads-total").textContent="0";
+
+  try{
+    var res=await fetch(PROXY+"/apollo/contacts/search",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","X-Apollo-Key":APOLLO_KEY},
+      body:JSON.stringify({page:curPage,per_page:pp,label_ids:[listId]})
+    });
+    var data=await res.json();
+    if(!data.contacts&&!data.people){
+      document.getElementById("leads-error").innerHTML='<div class="error-box">Error: '+(data.message||"Could not load contacts")+"</div>";
+      tbody.innerHTML="";return;
+    }
+    var people=data.contacts||data.people||[];
+    leads.length=0;
+    people.forEach(function(p){
+      leads.push({
+        id:p.id,
+        name:(p.first_name||"")+" "+(p.last_name||""),
+        title:p.title||"",
+        company:p.organization_name||p.account_name||(p.organization?p.organization.name:"")||"",
+        size:"",
+        location:[p.city,p.state].filter(Boolean).join(", ")||p.country||"",
+        email:p.email||"",
+        li:p.linkedin_url||"",
+        av:((p.first_name||"?")[0]+(p.last_name||"?")[0]).toUpperCase()
+      });
+    });
+    totalLeads=data.pagination?data.pagination.total_entries:leads.length;
+    renderLeads();
+    renderPagination(data.pagination,pp);
+    toast("Loaded "+leads.length+" contacts from list — no credits used");
+  }catch(e){
+    document.getElementById("leads-error").innerHTML='<div class="error-box">Error: '+e.message+"</div>";
+    tbody.innerHTML="";
+  }
+}
 async function searchContactsInAccounts(){
   if(!listAccountIds.length){toast("No companies loaded");return;}
   document.getElementById("accounts-panel").style.display="none";
