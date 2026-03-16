@@ -44,6 +44,11 @@ nav{background:#fff;border-bottom:1px solid var(--gray2);display:flex;align-item
 .filter-source{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid var(--gray2);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px;transition:all .12s}
 .filter-source.on{border-color:var(--cyan);background:var(--cyan-light);color:var(--cyan)}
 .source-dot{width:8px;height:8px;border-radius:50%}
+.titles-box{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1.5px solid var(--gray2);border-radius:8px;background:#fff;cursor:text;min-height:42px;align-items:center;transition:border-color .15s}
+.titles-box:focus-within{border-color:var(--cyan)}
+.title-tag{display:inline-flex;align-items:center;gap:4px;background:var(--cyan-light);color:var(--cyan2);border:1px solid var(--cyan-pale);border-radius:50px;padding:3px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+.title-tag-x{cursor:pointer;font-size:15px;line-height:1;margin-left:2px;opacity:.6}.title-tag-x:hover{opacity:1}
+.titles-inp{border:none;outline:none;font-size:13px;flex:1;min-width:100px;background:transparent;padding:2px 0;color:var(--text)}
 .leads-pane{padding:20px;background:var(--gray)}
 .leads-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .leads-count{font-size:13px;color:var(--text2);font-weight:600}.leads-count span{color:var(--cyan);font-weight:800}
@@ -190,8 +195,11 @@ nav{background:#fff;border-bottom:1px solid var(--gray2);display:flex;align-item
         <div class="filter-source on"><div class="source-dot" style="background:#0ea5e9"></div>Apollo.io<span style="margin-left:auto;font-size:10px;color:var(--green)">Live</span></div>
       </div>
       <div class="filter-group">
-        <span class="filter-label">Job Titles</span>
-        <input class="filter-input" id="f-titles" placeholder="CEO, CTO, VP of IT..." value="CEO, CTO, VP"/>
+        <span class="filter-label">Job Titles — press Enter to add</span>
+        <div class="titles-box" id="titles-box" onclick="document.getElementById('titles-inp').focus()">
+          <div id="titles-tags" style="display:contents"></div>
+          <input id="titles-inp" class="titles-inp" placeholder="e.g. CEO, VP of IT..."/>
+        </div>
       </div>
       <div class="filter-group">
         <span class="filter-label">Seniority</span>
@@ -302,8 +310,8 @@ nav{background:#fff;border-bottom:1px solid var(--gray2);display:flex;align-item
     <div class="s-card">
       <div class="s-card-hdr">Apollo Integration</div>
       <div class="s-card-body">
-        <div class="s-row"><div class="s-label">Proxy URL<div class="s-sub">Cloudflare Worker proxy</div></div><input class="s-input" id="cfg-proxy" value="https://apollo-proxy.jason-939.workers.dev"/><div class="conn-status"><div class="conn-dot ok"></div>Live</div></div>
-        <div class="s-row"><div class="s-label">Apollo API Key<div class="s-sub">Stored securely in Cloudflare</div></div><input class="s-input" type="password" value="••••••••••••••••••••"/><div class="conn-status"><div class="conn-dot ok"></div>Connected</div></div>
+        <div class="s-row"><div class="s-label">Proxy URL<div class="s-sub">Cloudflare Worker proxy</div></div><input class="s-input" value="https://apollo-proxy.jason-939.workers.dev"/><div class="conn-status"><div class="conn-dot ok"></div>Live</div></div>
+        <div class="s-row"><div class="s-label">Apollo API Key<div class="s-sub">Stored securely in Cloudflare</div></div><input class="s-input" type="password" value="stored-securely"/><div class="conn-status"><div class="conn-dot ok"></div>Connected</div></div>
       </div>
     </div>
     <div class="s-card">
@@ -334,6 +342,33 @@ const COLORS = ['#29abe2','#0ea5e9','#0d9488','#7c3aed','#db2777','#ea580c'];
 const gc = i => COLORS[i % COLORS.length];
 
 let leads = [], prospects = [], sel = new Set(), activeR = null, cModes = {}, curPage = 1, totalLeads = 0;
+let titleTags = ['CEO','CTO','VP'];
+
+// ── TAG INPUT ───────────────────────────────────────────────────────
+function initTitles() {
+  renderTitleTags();
+  const inp = document.getElementById('titles-inp');
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const val = inp.value.trim().replace(/,$/, '');
+      if (val && !titleTags.includes(val)) { titleTags.push(val); renderTitleTags(); }
+      inp.value = '';
+    } else if (e.key === 'Backspace' && inp.value === '' && titleTags.length) {
+      titleTags.pop(); renderTitleTags();
+    }
+  });
+}
+
+function renderTitleTags() {
+  const wrap = document.getElementById('titles-tags');
+  wrap.innerHTML = titleTags.map((t, i) =>
+    '<span class="title-tag">' + t +
+    '<span class="title-tag-x" onclick="removeTitle(' + i + ')">&times;</span></span>'
+  ).join('');
+}
+
+function removeTitle(i) { titleTags.splice(i, 1); renderTitleTags(); }
 
 // ── APOLLO LIVE SEARCH ──────────────────────────────────────────────
 async function runSearch(page) {
@@ -342,24 +377,17 @@ async function runSearch(page) {
   tbody.innerHTML = '<tr><td colspan="7"><div class="loading-bar"><div class="spinner"></div>Searching Apollo for live leads...</div></td></tr>';
   document.getElementById('leads-error').innerHTML = '';
 
-  const titles = document.getElementById('f-titles').value.split(',').map(t => t.trim()).filter(Boolean);
   const location = document.getElementById('f-location').value;
   const industry = document.getElementById('f-industry').value;
   const perPage = parseInt(document.getElementById('f-perpage').value);
-
   const seniority = Array.from(document.querySelectorAll('.filter-tag.on')).map(t => t.textContent.toLowerCase().replace('-','_').replace('c_level','c_suite'));
-
-  const sizes = [];
-  const sizeMap = {'1-10':'1,10','11-50':'11,50','51-200':'51,200','201-500':'201,500','500+':'500,10000'};
-  document.querySelectorAll('.filter-tag.on').forEach(t => { if(sizeMap[t.textContent]) sizes.push(sizeMap[t.textContent]); });
 
   const body = {
     page: curPage,
     per_page: perPage,
-    person_titles: titles.length ? titles : undefined,
+    person_titles: titleTags.length ? titleTags : undefined,
     person_seniorities: seniority.length ? seniority : undefined,
     organization_locations: location ? [location] : undefined,
-    organization_industry_tag_ids: undefined,
     contact_email_status: ['verified','guessed','unavailable','bounced','pending_manual_fulfillment'],
   };
   if (industry) body.q_organization_keyword_tags = [industry];
@@ -378,15 +406,14 @@ async function runSearch(page) {
     }
     leads = data.people.map(p => ({
       id: p.id,
-      name: (p.first_name || '') + ' ' + (p.last_name || ''),
+      name: (p.first_name||'') + ' ' + (p.last_name||''),
       title: p.title || '',
-      company: p.organization ? p.organization.name : (p.employment_history?.[0]?.organization_name || ''),
+      company: p.organization ? p.organization.name : (p.employment_history?.[0]?.organization_name||''),
       size: p.organization ? formatSize(p.organization.estimated_num_employees) : '',
       location: [p.city, p.state].filter(Boolean).join(', ') || p.country || '',
       email: p.email || '',
       li: p.linkedin_url || '',
       av: ((p.first_name||'?')[0] + (p.last_name||'?')[0]).toUpperCase(),
-      phone: p.sanitized_phone || '',
     }));
     totalLeads = data.pagination ? data.pagination.total_entries : leads.length;
     renderLeads();
@@ -400,16 +427,13 @@ async function runSearch(page) {
 
 function formatSize(n) {
   if (!n) return 'Unknown';
-  if (n < 11) return '1-10 emp';
-  if (n < 51) return '11-50 emp';
-  if (n < 201) return '51-200 emp';
-  if (n < 501) return '201-500 emp';
-  return '500+ emp';
+  if (n < 11) return '1-10 emp'; if (n < 51) return '11-50 emp';
+  if (n < 201) return '51-200 emp'; if (n < 501) return '201-500 emp'; return '500+ emp';
 }
 
 function renderPagination(pag, perPage) {
   if (!pag) return;
-  const total = pag.total_entries, pages = Math.ceil(total / perPage);
+  const pages = Math.ceil(pag.total_entries / perPage);
   let html = 'Page ' + curPage + ' of ' + pages.toLocaleString() + ' &nbsp;';
   if (curPage > 1) html += '<a onclick="runSearch(' + (curPage-1) + ')">← Prev</a> &nbsp;';
   if (curPage < pages) html += '<a onclick="runSearch(' + (curPage+1) + ')">Next →</a>';
@@ -419,11 +443,12 @@ function renderPagination(pag, perPage) {
 function renderLeads() {
   const tb = document.getElementById('leads-tbody');
   if (!leads.length) { tb.innerHTML = '<tr><td colspan="7"><div class="loading-bar">No leads found. Try adjusting your filters.</div></td></tr>'; return; }
-  tb.innerHTML = leads.map((l,i) => '<tr><td><input type="checkbox" ' + (sel.has(l.id)?'checked':'') + ' onchange="toggleL('' + l.id + '',this.checked)"/></td>' +
+  tb.innerHTML = leads.map((l,i) =>
+    '<tr><td><input type="checkbox" ' + (sel.has(l.id)?'checked':'') + ' onchange="toggleL('' + l.id + '',this.checked)"/></td>' +
     '<td><div class="lead-name-cell"><div class="avatar" style="background:' + gc(i) + '">' + l.av + '</div><div><div class="lead-name">' + l.name + '</div><div class="lead-sub">' + l.title + '</div></div></div></td>' +
     '<td>' + (l.company||'—') + '</td><td>' + (l.size||'—') + '</td><td>' + (l.location||'—') + '</td>' +
     '<td>' + (l.email ? '<span class="badge badge-verified">' + l.email + '</span>' : '<span class="badge badge-pending">Not available</span>') + '</td>' +
-    '<td><div class="action-btns"><div class="icon-btn add" onclick="addP('' + l.id + '')" title="Add to Prospects"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg></div>' +
+    '<td><div class="action-btns"><div class="icon-btn add" onclick="addP('' + l.id + '')" title="Add"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg></div>' +
     '<div class="icon-btn ign" onclick="ignOne('' + l.id + '')" title="Ignore"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-width="2"/></svg></div></div></td></tr>'
   ).join('');
   document.getElementById('leads-shown').textContent = leads.length;
@@ -433,91 +458,74 @@ function renderLeads() {
 
 function toggleL(id, on) { on ? sel.add(id) : sel.delete(id); }
 function selectAll(cb) { leads.forEach(l => cb.checked ? sel.add(l.id) : sel.delete(l.id)); renderLeads(); }
-function addP(id) {
-  const l = leads.find(x => x.id === id);
-  if (!l || prospects.find(p => p.id === id)) return;
-  prospects.push({...l, stage:'new'});
-  leads.splice(leads.indexOf(l), 1);
-  toast(l.name + ' added to Prospects');
-  updateStats(); renderLeads(); renderProspects(); renderRL(); renderOutreach();
-}
-function bulkAdd() { if (!sel.size) { toast('Select leads first'); return; } [...sel].forEach(addP); sel.clear(); }
-function ignOne(id) { leads.splice(leads.findIndex(l => l.id === id), 1); renderLeads(); toast('Lead ignored'); }
-function bulkIgnore() { sel.forEach(id => leads.splice(leads.findIndex(l => l.id === id), 1)); sel.clear(); renderLeads(); }
-function filterTable(q) { document.querySelectorAll('#leads-tbody tr').forEach(r => { r.style.display = r.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none'; }); }
+function addP(id) { const l = leads.find(x => x.id===id); if(!l||prospects.find(p=>p.id===id)) return; prospects.push({...l,stage:'new'}); leads.splice(leads.indexOf(l),1); toast(l.name+' added to Prospects'); updateStats(); renderLeads(); renderProspects(); renderRL(); renderOutreach(); }
+function bulkAdd() { if(!sel.size){toast('Select leads first');return} [...sel].forEach(addP); sel.clear(); }
+function ignOne(id) { leads.splice(leads.findIndex(l=>l.id===id),1); renderLeads(); toast('Lead ignored'); }
+function bulkIgnore() { sel.forEach(id=>leads.splice(leads.findIndex(l=>l.id===id),1)); sel.clear(); renderLeads(); }
+function filterTable(q) { document.querySelectorAll('#leads-tbody tr').forEach(r=>{r.style.display=r.textContent.toLowerCase().includes(q.toLowerCase())?'':'none'}); }
 
 function renderProspects(filter) {
   const g = document.getElementById('prospect-grid');
-  const list = filter ? prospects.filter(p => sName(p.stage) === filter) : prospects;
-  if (!list.length) { g.innerHTML = '<div style="color:var(--text2);grid-column:1/-1;padding:32px;text-align:center">' + (prospects.length ? 'No prospects match this filter.' : 'No prospects yet. Add leads from Find Leads.') + '</div>'; return; }
-  g.innerHTML = list.map((p,i) => '<div class="prospect-card"><div class="p-card-hdr"><div class="avatar" style="background:' + gc(i) + ';width:44px;height:44px;font-size:14px;position:relative">' + p.av + '</div><div style="position:relative"><div class="p-name">' + p.name + '</div><div class="p-role">' + p.title + '</div><div class="p-co">' + p.company + '</div></div><span class="stage-badge s' + p.stage[0] + '" style="margin-left:auto;position:relative">' + sName(p.stage) + '</span></div><div class="prospect-body"><div class="prospect-meta"><div class="meta-chip">' + (p.size||'') + '</div><div class="meta-chip">' + (p.location||'') + '</div>' + (p.email ? '<div class="meta-chip">' + p.email + '</div>' : '') + '</div>' + (p.aiS ? '<div class="ai-box"><strong>AI: </strong>' + p.aiS + '</div>' : '<div class="ai-box" style="color:var(--gray3);border-left-color:var(--gray3)">AI research not yet run</div>') + '<div class="prospect-actions"><button class="btn btn-primary btn-sm" onclick="goR('' + p.id + '')">Research</button><button class="btn btn-outline btn-sm" onclick="goO('' + p.id + '')">Outreach</button><button class="btn btn-ghost btn-sm" onclick="nextStage('' + p.id + '')">Next Stage</button></div></div></div>').join('');
+  const list = filter ? prospects.filter(p=>sName(p.stage)===filter) : prospects;
+  if (!list.length) { g.innerHTML='<div style="color:var(--text2);grid-column:1/-1;padding:32px;text-align:center">'+(prospects.length?'No prospects match this filter.':'No prospects yet. Add leads from Find Leads.')+'</div>'; return; }
+  g.innerHTML = list.map((p,i) => '<div class="prospect-card"><div class="p-card-hdr"><div class="avatar" style="background:'+gc(i)+';width:44px;height:44px;font-size:14px;position:relative">'+p.av+'</div><div style="position:relative"><div class="p-name">'+p.name+'</div><div class="p-role">'+p.title+'</div><div class="p-co">'+p.company+'</div></div><span class="stage-badge s'+p.stage[0]+'" style="margin-left:auto;position:relative">'+sName(p.stage)+'</span></div><div class="prospect-body"><div class="prospect-meta"><div class="meta-chip">'+(p.size||'')+'</div><div class="meta-chip">'+(p.location||'')+'</div>'+(p.email?'<div class="meta-chip">'+p.email+'</div>':'')+'</div>'+(p.aiS?'<div class="ai-box"><strong>AI: </strong>'+p.aiS+'</div>':'<div class="ai-box" style="color:var(--gray3);border-left-color:var(--gray3)">AI research not yet run</div>')+'<div class="prospect-actions"><button class="btn btn-primary btn-sm" onclick="goR(''+p.id+'')">Research</button><button class="btn btn-outline btn-sm" onclick="goO(''+p.id+'')">Outreach</button><button class="btn btn-ghost btn-sm" onclick="nextStage(''+p.id+'')">Next Stage</button></div></div></div>').join('');
   document.getElementById('stat-prospects').textContent = prospects.length;
 }
 
 function filterProspects(val) { renderProspects(val); }
-function sName(s) { return {new:'New',research:'Researching',messaged:'Messaged',replied:'Replied',call:'Call Sched.'}[s] || s; }
-function nextStage(id) { const p = prospects.find(x => x.id === id); const st = ['new','research','messaged','replied','call']; p.stage = st[(st.indexOf(p.stage)+1)%st.length]; renderProspects(); }
-function goR(id) { showPage('research'); setTimeout(() => selectR(id), 50); }
-function goO(id) { showPage('outreach'); setTimeout(() => selectO(id), 50); }
+function sName(s) { return{new:'New',research:'Researching',messaged:'Messaged',replied:'Replied',call:'Call Sched.'}[s]||s; }
+function nextStage(id) { const p=prospects.find(x=>x.id===id); const st=['new','research','messaged','replied','call']; p.stage=st[(st.indexOf(p.stage)+1)%st.length]; renderProspects(); }
+function goR(id) { showPage('research'); setTimeout(()=>selectR(id),50); }
+function goO(id) { showPage('outreach'); setTimeout(()=>selectO(id),50); }
 
-function renderRL() {
-  document.getElementById('r-list-items').innerHTML = prospects.map((p,i) => '<div class="r-item ' + (activeR===p.id?'active':'') + '" onclick="selectR('' + p.id + '')"><div class="avatar" style="background:' + gc(i) + ';width:34px;height:34px;font-size:12px;flex-shrink:0">' + p.av + '</div><div><div class="r-item-name">' + p.name + (p.aiS?' ✓':'') + '</div><div class="r-item-co">' + p.company + '</div></div></div>').join('');
-}
+function renderRL() { document.getElementById('r-list-items').innerHTML=prospects.map((p,i)=>'<div class="r-item '+(activeR===p.id?'active':'')+'" onclick="selectR(''+p.id+'')"><div class="avatar" style="background:'+gc(i)+';width:34px;height:34px;font-size:12px;flex-shrink:0">'+p.av+'</div><div><div class="r-item-name">'+p.name+(p.aiS?' ✓':'')+'</div><div class="r-item-co">'+p.company+'</div></div></div>').join(''); }
 
 function selectR(id) {
-  activeR = id; renderRL();
-  const p = prospects.find(x => x.id === id);
-  if (p.aiS) { showRResult(p); return; }
-  document.getElementById('r-pane').innerHTML = '<div class="r-card"><div class="r-card-top"><div class="avatar" style="background:' + gc(prospects.indexOf(p)) + ';width:52px;height:52px;font-size:17px;position:relative">' + p.av + '</div><div style="position:relative"><div style="font-size:18px;font-weight:800;color:#fff">' + p.name + '</div><div style="font-size:13px;color:#a0b4cc">' + p.title + ' at ' + p.company + '</div></div></div><div class="r-card-body"><div class="ai-load"><div class="dot-pulse"><span></span><span></span><span></span></div>Ready to research ' + p.name + '</div><button class="btn btn-primary" style="margin-top:12px" onclick="runR('' + p.id + '')">Run AI Research Now</button></div></div>';
+  activeR=id; renderRL();
+  const p=prospects.find(x=>x.id===id);
+  if(p.aiS){showRResult(p);return}
+  document.getElementById('r-pane').innerHTML='<div class="r-card"><div class="r-card-top"><div class="avatar" style="background:'+gc(prospects.indexOf(p))+';width:52px;height:52px;font-size:17px;position:relative">'+p.av+'</div><div style="position:relative"><div style="font-size:18px;font-weight:800;color:#fff">'+p.name+'</div><div style="font-size:13px;color:#a0b4cc">'+p.title+' at '+p.company+'</div></div></div><div class="r-card-body"><div class="ai-load"><div class="dot-pulse"><span></span><span></span><span></span></div>Ready to research '+p.name+'</div><button class="btn btn-primary" style="margin-top:12px" onclick="runR(''+p.id+'')">Run AI Research Now</button></div></div>';
 }
 
 function runR(id) {
-  const p = prospects.find(x => x.id === id);
-  const ld = document.querySelector('.ai-load');
-  if (ld) ld.innerHTML = '<div class="dot-pulse"><span></span><span></span><span></span></div> Analyzing profile, company, and generating message...';
-  setTimeout(() => {
-    p.aiS = p.company + ' is growing — likely has IT infrastructure needs. ' + p.name + ' is a decision-maker worth reaching out to with a concise, value-driven message.';
-    p.insights = [
-      {t: p.company + ' — decision maker with budget authority'},
-      {t: 'Located in ' + (p.location||'your target area') + ' — local relationship opportunity'},
-      {t: p.email ? 'Email available: ' + p.email : 'LinkedIn outreach recommended'},
-      {t: 'Personalized intro message generated below'}
-    ];
-    p.msg = 'Hi ' + p.name.split(' ')[0] + ', I noticed ' + p.company + ' is growing and wanted to reach out. We help companies in ' + (p.location||'your area') + ' keep their IT completely off their plate — 24/7 monitoring, no surprises, and a team that actually picks up the phone. Would love to share how we've helped similar businesses. Open to a quick 15-min call?';
-    p.stage = 'research';
-    showRResult(p); renderProspects(); renderRL(); updateStats();
-    toast('AI research complete for ' + p.name);
-  }, 2000);
+  const p=prospects.find(x=>x.id===id);
+  const ld=document.querySelector('.ai-load');
+  if(ld) ld.innerHTML='<div class="dot-pulse"><span></span><span></span><span></span></div> Analyzing profile and generating message...';
+  setTimeout(()=>{
+    p.aiS=p.company+' is growing and likely has IT infrastructure needs. '+p.name+' is a key decision-maker worth a personalized outreach.';
+    p.insights=[{t:p.company+' — decision maker with budget authority'},{t:'Located in '+(p.location||'your target area')+' — local relationship opportunity'},{t:p.email?'Email available: '+p.email:'LinkedIn outreach recommended'},{t:'Personalized intro message generated below'}];
+    p.msg='Hi '+p.name.split(' ')[0]+', I noticed '+p.company+' is growing and wanted to reach out. We help companies in '+(p.location||'your area')+' keep their IT completely off their plate — 24/7 monitoring, no surprises, and a local team that actually picks up the phone. Would love to share how we've helped similar businesses. Open to a quick 15-min call?';
+    p.stage='research'; showRResult(p); renderProspects(); renderRL(); updateStats(); toast('AI research complete for '+p.name);
+  },2000);
 }
 
 function showRResult(p) {
-  document.getElementById('r-pane').innerHTML = '<div class="r-card"><div class="r-card-top"><div class="avatar" style="background:' + gc(prospects.indexOf(p)) + ';width:52px;height:52px;font-size:17px;position:relative">' + p.av + '</div><div style="position:relative"><div style="font-size:18px;font-weight:800;color:#fff">' + p.name + '</div><div style="font-size:13px;color:#a0b4cc">' + p.title + ' at ' + p.company + '</div>' + (p.email ? '<div style="font-size:12px;color:var(--cyan);margin-top:2px">' + p.email + '</div>' : '') + '</div><button class="btn btn-primary btn-sm" style="margin-left:auto;position:relative" onclick="goO('' + p.id + '')">Compose Outreach</button></div><div class="r-card-body"><div class="r-section"><h3>AI Insights</h3>' + (p.insights||[]).map(i => '<div class="r-insight"><span style="margin-right:6px;color:var(--cyan)">✦</span><span>' + i.t + '</span></div>').join('') + '</div><div class="r-section"><h3>Suggested LinkedIn Message</h3><div class="msg-box"><p>' + p.msg + '</p></div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary btn-sm" onclick="goO('' + p.id + '')">Use This Message</button><button class="btn btn-ghost btn-sm" onclick="regenR('' + p.id + '')">Regenerate</button></div></div></div></div>';
+  document.getElementById('r-pane').innerHTML='<div class="r-card"><div class="r-card-top"><div class="avatar" style="background:'+gc(prospects.indexOf(p))+';width:52px;height:52px;font-size:17px;position:relative">'+p.av+'</div><div style="position:relative"><div style="font-size:18px;font-weight:800;color:#fff">'+p.name+'</div><div style="font-size:13px;color:#a0b4cc">'+p.title+' at '+p.company+'</div>'+(p.email?'<div style="font-size:12px;color:var(--cyan);margin-top:2px">'+p.email+'</div>':'')+'</div><button class="btn btn-primary btn-sm" style="margin-left:auto;position:relative" onclick="goO(''+p.id+'')">Compose Outreach</button></div><div class="r-card-body"><div class="r-section"><h3>AI Insights</h3>'+(p.insights||[]).map(i=>'<div class="r-insight"><span style="margin-right:6px;color:var(--cyan)">✦</span><span>'+i.t+'</span></div>').join('')+'</div><div class="r-section"><h3>Suggested LinkedIn Message</h3><div class="msg-box"><p>'+p.msg+'</p></div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary btn-sm" onclick="goO(''+p.id+'')">Use This Message</button><button class="btn btn-ghost btn-sm" onclick="regenR(''+p.id+'')">Regenerate</button></div></div></div></div>';
 }
 
-function runAllResearch() { prospects.filter(p => !p.aiS).forEach(p => { selectR(p.id); setTimeout(() => runR(p.id), 200); }); toast('Running AI research on all prospects...'); }
-function regenR(id) { const p = prospects.find(x => x.id === id); p.aiS = null; selectR(id); setTimeout(() => runR(id), 100); }
+function runAllResearch() { prospects.filter(p=>!p.aiS).forEach(p=>{selectR(p.id);setTimeout(()=>runR(p.id),200)}); toast('Running AI research on all prospects...'); }
+function regenR(id) { const p=prospects.find(x=>x.id===id); p.aiS=null; selectR(id); setTimeout(()=>runR(id),100); }
 
 function renderOutreach() {
-  document.getElementById('o-items').innerHTML = prospects.map((p,i) => '<div class="o-item" onclick="selectO('' + p.id + '')"><div class="avatar" style="background:' + gc(i) + ';width:36px;height:36px;font-size:12px;flex-shrink:0">' + p.av + '</div><div class="o-item-info"><div class="o-item-name">' + p.name + '</div><div class="o-item-prev">' + (p.msg ? p.msg.substring(0,50)+'...' : 'No message yet') + '</div></div></div>').join('');
-  document.getElementById('o-count').textContent = prospects.length;
+  document.getElementById('o-items').innerHTML=prospects.map((p,i)=>'<div class="o-item" onclick="selectO(''+p.id+'')"><div class="avatar" style="background:'+gc(i)+';width:36px;height:36px;font-size:12px;flex-shrink:0">'+p.av+'</div><div class="o-item-info"><div class="o-item-name">'+p.name+'</div><div class="o-item-prev">'+(p.msg?p.msg.substring(0,50)+'...':'No message yet')+'</div></div></div>').join('');
+  document.getElementById('o-count').textContent=prospects.length;
 }
 
 function selectO(id) {
-  const p = prospects.find(x => x.id === id);
-  const mode = cModes[id] || 'linkedin';
-  document.getElementById('o-pane').innerHTML = '<div class="compose-card"><div class="c-hdr"><div class="c-hdr-title"><div class="avatar" style="background:' + gc(prospects.indexOf(p)) + ';width:28px;height:28px;font-size:11px">' + p.av + '</div>' + p.name + ' · ' + p.company + '</div><div class="c-tabs"><div class="c-tab ' + (mode==='linkedin'?'active':'') + '" onclick="setMode('' + p.id + '','linkedin')">LinkedIn</div><div class="c-tab ' + (mode==='email'?'active':'') + '" onclick="setMode('' + p.id + '','email')">Email</div></div></div><div class="c-body">' + (mode==='email'?'<input class="filter-input" placeholder="Subject..." style="margin-bottom:8px" value="Quick question about ' + p.company + '"/>':'') + '<textarea class="c-textarea" id="msg-' + p.id + '" oninput="updCC('' + p.id + '')">' + (p.msg||'') + '</textarea></div><div class="c-footer"><span class="char-count" id="cc-' + p.id + '">' + (p.msg||'').length + ' chars' + (mode==='linkedin'?' / 300 limit':'') + '</span><div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="regenO('' + p.id + '')">Regenerate</button><button class="btn btn-primary btn-sm" onclick="sendO('' + p.id + '','' + mode + '')">' + (mode==='linkedin'?'Open LinkedIn →':'Send Email') + '</button></div></div></div><div class="seq-card"><div class="c-hdr" style="padding:12px 18px"><div class="c-hdr-title" style="font-size:13px">Follow-up Sequence</div><button class="btn btn-outline btn-sm">+ Add Step</button></div><div class="seq-item"><div class="seq-num">1</div><div style="flex:1">LinkedIn intro message<br><span style="font-size:11px;color:var(--text2)">Day 1 · Manual send</span></div><span class="badge ' + (p.stage==='messaged'||p.stage==='replied'?'badge-verified':'badge-pending') + '">' + (p.stage==='messaged'||p.stage==='replied'?'Sent':'Pending') + '</span></div><div class="seq-item"><div class="seq-num">2</div><div style="flex:1">Follow-up email — value prop<br><span style="font-size:11px;color:var(--text2)">Day 4 · Auto via Office 365</span></div><span class="badge badge-pending">Pending</span></div><div class="seq-item"><div class="seq-num">3</div><div style="flex:1">Final email — soft close<br><span style="font-size:11px;color:var(--text2)">Day 10 · Auto via Office 365</span></div><span class="badge badge-pending">Pending</span></div></div>';
+  const p=prospects.find(x=>x.id===id); const mode=cModes[id]||'linkedin';
+  document.getElementById('o-pane').innerHTML='<div class="compose-card"><div class="c-hdr"><div class="c-hdr-title"><div class="avatar" style="background:'+gc(prospects.indexOf(p))+';width:28px;height:28px;font-size:11px">'+p.av+'</div>'+p.name+' · '+p.company+'</div><div class="c-tabs"><div class="c-tab '+(mode==='linkedin'?'active':'')+'" onclick="setMode(''+p.id+'','linkedin')">LinkedIn</div><div class="c-tab '+(mode==='email'?'active':'')+'" onclick="setMode(''+p.id+'','email')">Email</div></div></div><div class="c-body">'+(mode==='email'?'<input class="filter-input" placeholder="Subject..." style="margin-bottom:8px" value="Quick question about '+p.company+'"/>':'')+'<textarea class="c-textarea" id="msg-'+p.id+'" oninput="updCC(''+p.id+'')">'+(p.msg||'')+'</textarea></div><div class="c-footer"><span class="char-count" id="cc-'+p.id+'">'+(p.msg||'').length+' chars'+(mode==='linkedin'?' / 300 limit':'')+'</span><div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="regenO(''+p.id+'')">Regenerate</button><button class="btn btn-primary btn-sm" onclick="sendO(''+p.id+'',''+mode+'')">'+(mode==='linkedin'?'Open LinkedIn →':'Send Email')+'</button></div></div></div><div class="seq-card"><div class="c-hdr" style="padding:12px 18px"><div class="c-hdr-title" style="font-size:13px">Follow-up Sequence</div><button class="btn btn-outline btn-sm">+ Add Step</button></div><div class="seq-item"><div class="seq-num">1</div><div style="flex:1">LinkedIn intro message<br><span style="font-size:11px;color:var(--text2)">Day 1 · Manual send</span></div><span class="badge '+(p.stage==='messaged'||p.stage==='replied'?'badge-verified':'badge-pending')+'">'+(p.stage==='messaged'||p.stage==='replied'?'Sent':'Pending')+'</span></div><div class="seq-item"><div class="seq-num">2</div><div style="flex:1">Follow-up email — value prop<br><span style="font-size:11px;color:var(--text2)">Day 4 · Auto via Office 365</span></div><span class="badge badge-pending">Pending</span></div><div class="seq-item"><div class="seq-num">3</div><div style="flex:1">Final email — soft close<br><span style="font-size:11px;color:var(--text2)">Day 10 · Auto via Office 365</span></div><span class="badge badge-pending">Pending</span></div></div>';
 }
 
-function setMode(id, m) { cModes[id] = m; selectO(id); }
-function updCC(id) { const ta = document.getElementById('msg-'+id); const cc = document.getElementById('cc-'+id); if(ta&&cc) cc.textContent = ta.value.length + ' chars'; }
-function sendO(id, mode) { const p = prospects.find(x => x.id===id); p.stage='messaged'; if(mode==='linkedin'&&p.li) window.open(p.li,'_blank'); renderProspects(); renderOutreach(); updateStats(); toast(mode==='linkedin'?'Opening LinkedIn for '+p.name+'...':'Email queued for '+p.name); }
-function regenO(id) { const p = prospects.find(x => x.id===id); p.msg='Hi '+p.name.split(' ')[0]+', saw your team is growing at '+p.company+'. We help businesses like yours keep IT completely off their plate — 24/7, no surprises. Worth a quick call?'; selectO(id); }
+function setMode(id,m) { cModes[id]=m; selectO(id); }
+function updCC(id) { const ta=document.getElementById('msg-'+id); const cc=document.getElementById('cc-'+id); if(ta&&cc) cc.textContent=ta.value.length+' chars'; }
+function sendO(id,mode) { const p=prospects.find(x=>x.id===id); p.stage='messaged'; if(mode==='linkedin'&&p.li) window.open(p.li,'_blank'); renderProspects(); renderOutreach(); updateStats(); toast(mode==='linkedin'?'Opening LinkedIn for '+p.name+'...':'Email queued for '+p.name); }
+function regenO(id) { const p=prospects.find(x=>x.id===id); p.msg='Hi '+p.name.split(' ')[0]+', saw your team is growing at '+p.company+'. We help businesses like yours keep IT completely off their plate — 24/7, no surprises. Worth a quick call?'; selectO(id); }
 
 function updateStats() {
-  document.getElementById('stat-leads').textContent = leads.length + prospects.length;
-  document.getElementById('stat-prospects').textContent = prospects.length;
-  document.getElementById('stat-messaged').textContent = prospects.filter(p=>p.stage==='messaged'||p.stage==='replied'||p.stage==='call').length;
-  document.getElementById('stat-replies').textContent = prospects.filter(p=>p.stage==='replied'||p.stage==='call').length;
+  document.getElementById('stat-leads').textContent=leads.length+prospects.length;
+  document.getElementById('stat-prospects').textContent=prospects.length;
+  document.getElementById('stat-messaged').textContent=prospects.filter(p=>p.stage==='messaged'||p.stage==='replied'||p.stage==='call').length;
+  document.getElementById('stat-replies').textContent=prospects.filter(p=>p.stage==='replied'||p.stage==='call').length;
 }
 
 function toggleTag(el) { el.classList.toggle('on'); }
@@ -533,6 +541,7 @@ function showPage(name) {
   if(name==='outreach')renderOutreach();
 }
 function toast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._to); t._to=setTimeout(()=>t.classList.remove('show'),3000); }
+initTitles();
 </script>
 </body>
 </html>
