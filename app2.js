@@ -392,22 +392,29 @@ function selectR(id){
 function runR(id){
   var p=prospects.find(function(x){return x.id===id;});
   var ld=document.querySelector(".ai-load");
-  if(ld)ld.innerHTML='<div class="dot-pulse"><span></span><span></span><span></span></div> Analyzing...';
+  if(ld)ld.innerHTML='<div class="dot-pulse"><span></span><span></span><span></span></div> Generating 4-step LinkedIn sequence...';
   setTimeout(function(){
-    p.aiS=p.company+" is growing and likely has IT infrastructure needs. "+p.name+" is a key decision-maker worth a personalized outreach.";
+    var first=p.name.split(" ")[0];
+    var loc=p.coLocation||p.location||"the Denver area";
+    var co=p.company;
+    p.aiS=co+" is in your target area. "+p.name+" is a decision-maker — use the 4-step sequence to build rapport before introducing Workplace IT.";
     p.insights=[
-      {t:p.company+" - decision maker with budget authority"},
-      {t:"Located in "+(p.coLocation||p.location||"your area")+" - local relationship opportunity"},
-      {t:p.email?"Email available: "+p.email:"LinkedIn outreach recommended"},
-      {t:"Custom intro message generated below"}
+      {t:"Never pitch on the connection request — just connect"},
+      {t:"Thank them first, then start a real conversation"},
+      {t:"Introduce what you do only after rapport is established"},
+      {t:p.email?"Email also available for follow-up: "+p.email:"LinkedIn is the primary channel"}
     ];
-    p.msg="Hi "+p.name.split(" ")[0]+", I noticed "+p.company+" is growing and wanted to reach out. "
-      +"We help companies in "+(p.coLocation||p.location||"your area")+" keep IT completely off their plate - "
-      +"24/7 monitoring, no surprises, local team that picks up the phone. "
-      +"Would love to show how we have helped similar businesses. Open to a quick 15-min call?";
+    // 4-step messages
+    p.msg1="Hi "+first+", I work with businesses in "+loc+" and came across your profile — would love to connect!";
+    p.msg2="Thanks for connecting, "+first+"! Really appreciate it. Hope things are going well at "+co+".";
+    p.msg3="Hey "+first+", I'm curious — what's been the biggest challenge on the IT or operations side at "+co+" lately? Always trying to understand what local businesses are dealing with.";
+    p.msg4="Thanks for sharing that, "+first+". We actually help companies in "+loc+" take IT completely off their plate — 24/7 monitoring, local team, no surprises. Might be worth a quick 15-min chat to see if there's a fit. Would that be useful?";
+    // default msg for outreach tab (step 1)
+    p.msg=p.msg1;
+    p.msgStep=1;
     p.stage="research";
     showRResult(p);renderProspects();renderRL();updateStats();
-    toast("AI research complete for "+p.name);
+    toast("4-step sequence ready for "+p.name);
   },2000);
 }
 function showRResult(p){
