@@ -36,16 +36,20 @@
     <div class="filter-panel">
       <div class="section-eyebrow">Search Criteria</div>
       <div class="cyan-rule"></div>
+
       <div class="filter-group" style="margin-top:14px">
         <span class="filter-label">Data Source</span>
         <div class="filter-source on"><div class="source-dot" style="background:#0ea5e9"></div>Apollo.io<span style="margin-left:auto;font-size:10px;color:var(--green)">Live</span></div>
       </div>
+
       <div class="filter-group">
         <span class="filter-label">Apollo List</span>
         <select class="filter-select" id="f-list" onchange="curPage=1;loadListAccounts()">
           <option value="">Loading lists...</option>
         </select>
+        <div style="font-size:11px;color:var(--text2);margin-top:6px">Select a list to browse companies free. Then search contacts within them.</div>
       </div>
+
       <div class="filter-group">
         <span class="filter-label">Job Titles - press Enter to add</span>
         <div class="titles-box" id="titles-box">
@@ -53,6 +57,7 @@
           <input id="titles-inp" class="titles-inp" placeholder="e.g. CEO, VP of IT..."/>
         </div>
       </div>
+
       <div class="filter-group">
         <span class="filter-label">Seniority</span>
         <div class="filter-tag-wrap">
@@ -62,6 +67,7 @@
           <div class="filter-tag" onclick="toggleTag(this)">Manager</div>
         </div>
       </div>
+
       <div class="filter-group">
         <span class="filter-label">Company Size</span>
         <div class="filter-tag-wrap">
@@ -72,6 +78,7 @@
           <div class="filter-tag" onclick="toggleTag(this)">500+</div>
         </div>
       </div>
+
       <div class="filter-group">
         <span class="filter-label">Industry</span>
         <select class="filter-select" id="f-industry">
@@ -83,10 +90,12 @@
           <option value="Legal">Legal</option>
         </select>
       </div>
+
       <div class="filter-group">
         <span class="filter-label">Location</span>
         <input class="filter-input" id="f-location" value="Denver, Colorado"/>
       </div>
+
       <div class="filter-group">
         <span class="filter-label">Results per page</span>
         <select class="filter-select" id="f-perpage">
@@ -95,11 +104,13 @@
           <option value="100">100</option>
         </select>
       </div>
-      <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="curPage=1;runSearch(1)">Search Apollo Live</button>
+
+      <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="curPage=1;runSearch(1,null)">Search Apollo Live</button>
     </div>
+
     <div class="leads-pane">
       <div id="leads-error"></div>
-      <div id="accounts-panel" style="display:none;padding:4px 0"></div>
+      <div id="accounts-panel" style="display:none"></div>
       <div class="leads-toolbar" id="leads-toolbar">
         <div class="leads-count">Showing <span id="leads-shown">0</span> of <span id="leads-total">0</span> leads</div>
         <div class="search-wrap">
@@ -112,7 +123,7 @@
       <div class="leads-table-wrap" id="leads-table-wrap">
         <table class="leads-table">
           <thead><tr><th><input type="checkbox" onclick="selectAll(this)"/></th><th>Name</th><th>Company</th><th>Size</th><th>Location</th><th>Email</th><th>Actions</th></tr></thead>
-          <tbody id="leads-tbody"><tr><td colspan="7"><div class="loading-bar">Click Search Apollo Live to fetch real leads</div></td></tr></tbody>
+          <tbody id="leads-tbody"><tr><td colspan="7"><div class="loading-bar">Select a list above to browse companies, or click Search Apollo Live to find contacts</div></td></tr></tbody>
         </table>
       </div>
       <div class="pagination" id="pagination"></div>
