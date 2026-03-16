@@ -175,9 +175,10 @@ async function loadPeopleList(listId){
         id:p.id,
         name:(p.first_name||"")+" "+(p.last_name||""),
         title:p.title||"",
-        company:p.organization_name||p.account_name||(p.organization?p.organization.name:"")||"",
+        company:p.organization_name||p.account_name||(p.account?p.account.name:"")||"",
         size:"",
         location:[p.city,p.state].filter(Boolean).join(", ")||p.country||"",
+        coLocation:[p.account?p.account.city:null,p.account?p.account.state:null].filter(Boolean).join(", ")||"",
         email:p.email||"",
         li:p.linkedin_url||"",
         av:((p.first_name||"?")[0]+(p.last_name||"?")[0]).toUpperCase()
@@ -291,10 +292,15 @@ function renderLeads(){
       :'<span style="display:inline-flex;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;background:#fef9c3;color:#854d0e">Not available</span>';
     var ab='<div class="icon-btn add" onclick="addP(\''+l.id+'\')" title="Add"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg></div>';
     var ib='<div class="icon-btn ign" onclick="ignOne(\''+l.id+'\')" title="Ignore"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-width="2"/></svg></div>';
+    var liLink=l.li?'<a href="'+l.li+'" target="_blank" style="color:var(--cyan);font-size:12px">View ↗</a>':"—";
     rows+="<tr><td>"+chk+"</td>"
       +'<td><div class="lead-name-cell">'+av+'<div><div class="lead-name">'+l.name+'</div><div class="lead-sub">'+l.title+"</div></div></div></td>"
-      +"<td>"+(l.company||"-")+"</td><td>"+(l.size||"-")+"</td><td>"+(l.location||"-")+"</td>"
-      +"<td>"+eb+"</td><td><div class='action-btns'>"+ab+ib+"</div></td></tr>";
+      +"<td>"+(l.company||"-")+"</td>"
+      +"<td style='font-size:12px'>"+(l.coLocation||l.location||"-")+"</td>"
+      +"<td>"+(l.size||"-")+"</td>"
+      +"<td>"+liLink+"</td>"
+      +"<td>"+eb+"</td>"
+      +"<td><div class='action-btns'>"+ab+ib+"</div></td></tr>";
   }
   tb.innerHTML=rows;
   document.getElementById("leads-shown").textContent=leads.length;
