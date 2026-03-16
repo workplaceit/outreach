@@ -41,6 +41,28 @@ function initTitles(){
   inp.addEventListener("blur",function(){box.style.borderColor="";});
 }
 
+// ── APOLLO LISTS ──────────────────────────────────────────────────
+async function loadApolloLists(){
+  var sel = document.getElementById("f-list");
+  if(!sel) return;
+  try {
+    var res = await fetch(PROXY+"/apollo/labels", {
+      headers:{"X-Apollo-Key":APOLLO_KEY}
+    });
+    var data = await res.json();
+    var arr = Array.isArray(data) ? data : Object.values(data);
+    sel.innerHTML = '<option value="">— No list filter —</option>';
+    arr.forEach(function(l){
+      var opt = document.createElement("option");
+      opt.value = l._id;
+      opt.textContent = l.name + " (" + (l.cached_count||0).toLocaleString() + ")";
+      sel.appendChild(opt);
+    });
+  } catch(e) {
+    console.log("Lists error:", e.message);
+  }
+}
+
 // ── APOLLO SEARCH ──────────────────────────────────────────────────
 async function runSearch(page){
   curPage=page||1;
@@ -49,6 +71,7 @@ async function runSearch(page){
   document.getElementById("leads-error").innerHTML="";
   var loc=document.getElementById("f-location").value;
   var ind=document.getElementById("f-industry").value;
+  var listId=document.getElementById("f-list").value;
   var pp=parseInt(document.getElementById("f-perpage").value);
   var sen=Array.from(document.querySelectorAll(".filter-tag.on")).map(function(t){
     return t.textContent.toLowerCase().replace(/-/g,"_").replace("c_level","c_suite");
@@ -61,6 +84,7 @@ async function runSearch(page){
   };
   if(titleTags.length)body.person_titles=titleTags;
   if(ind)body.q_organization_keyword_tags=[ind];
+  if(listId)body.label_ids=[listId];
   try{
     var res=await fetch(PROXY+"/apollo/mixed_people/search",{
       method:"POST",
@@ -384,3 +408,4 @@ function showPage(name){
 function toast(msg){var t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._to);t._to=setTimeout(function(){t.classList.remove("show");},3000);}
 
 initTitles();
+loadApolloLists();
