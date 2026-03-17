@@ -1,4 +1,3 @@
-
 // ============================================================
 // SUPABASE PERSISTENCE LAYER
 // ============================================================
@@ -15,13 +14,12 @@ function supaFetch(path, method, body) {
       'Prefer': method === 'POST' ? 'return=representation' : ''
     },
     body: body ? JSON.stringify(body) : undefined
-  }).then(function(r){ return r.json(); });
+  }).then(function(r) { return r.json(); });
 }
 
-// Load all prospects from Supabase
 function loadProspectsFromDB() {
   return supaFetch('prospects?order=created_at.desc').then(function(rows) {
-    if (!Array.isArray(rows)) return;
+    if (!Array.isArray(rows)) { console.error('DB load failed', rows); return; }
     prospects = rows.map(function(r) {
       return {
         id: r.id,
@@ -39,11 +37,12 @@ function loadProspectsFromDB() {
         outreachStep: r.outreach_step || 0
       };
     });
-    renderProspects();
-  }).catch(function(e){ console.error('DB load error', e); });
+    // Only render if DOM is ready and element exists
+    var wrap = document.getElementById('prospect-cards');
+    if (wrap) renderProspects();
+  }).catch(function(e) { console.error('DB load error', e); });
 }
 
-// Save a new prospect to Supabase
 function saveProspectToDB(p) {
   return supaFetch('prospects', 'POST', {
     first_name: p.fn,
@@ -59,13 +58,10 @@ function saveProspectToDB(p) {
     research_notes: p.research || '',
     outreach_step: p.outreachStep || 0
   }).then(function(rows) {
-    if (Array.isArray(rows) && rows[0]) {
-      p.id = rows[0].id; // store DB id on the prospect
-    }
-  }).catch(function(e){ console.error('DB save error', e); });
+    if (Array.isArray(rows) && rows[0]) { p.id = rows[0].id; }
+  }).catch(function(e) { console.error('DB save error', e); });
 }
 
-// Update a prospect in Supabase
 function updateProspectInDB(p) {
   if (!p.id) return saveProspectToDB(p);
   return supaFetch('prospects?id=eq.' + p.id, 'PATCH', {
@@ -80,547 +76,503 @@ function updateProspectInDB(p) {
     stage: p.stage || 'New',
     research_notes: p.research || '',
     outreach_step: p.outreachStep || 0
-  }).catch(function(e){ console.error('DB update error', e); });
+  }).catch(function(e) { console.error('DB update error', e); });
 }
 
-// Delete a prospect from Supabase
 function deleteProspectFromDB(id) {
   if (!id) return;
-  return supaFetch('prospects?id=eq.' + id, 'DELETE').catch(function(e){ console.error('DB delete error', e); });
+  return supaFetch('prospects?id=eq.' + id, 'DELETE')
+    .catch(function(e) { console.error('DB delete error', e); });
 }
 
-// Save settings key/value
 function saveSettingToDB(key, value) {
   return supaFetch('settings', 'POST', { key: key, value: value })
-    .catch(function(){
+    .catch(function() {
       return supaFetch('settings?key=eq.' + key, 'PATCH', { value: value });
     });
 }
 
-// Load all settings
 function loadSettingsFromDB() {
   return supaFetch('settings').then(function(rows) {
     if (!Array.isArray(rows)) return;
     rows.forEach(function(r) {
-      if (r.key === 'apolloKey') document.getElementById('s-apollo') && (document.getElementById('s-apollo').value = r.value);
-      if (r.key === 'anthropicKey') document.getElementById('s-anthropic') && (document.getElementById('s-anthropic').value = r.value);
+      if (r.key === 'apolloKey') {
+        var el = document.getElementById('s-apollo');
+        if (el) el.value = r.value;
+        apolloKey = r.value;
+      }
+      if (r.key === 'anthropicKey') {
+        var el2 = document.getElementById('s-anthropic');
+        if (el2) el2.value = r.value;
+      }
     });
-  }).catch(function(e){ console.error('Settings load error', e); });
+  }).catch(function(e) { console.error('Settings load error', e); });
 }
 
 // ============================================================
 // END SUPABASE LAYER
 // ============================================================
-var PROXY="https://apollo-proxy.jason-939.workers.dev";
-var APOLLO_KEY="4j1OoTcIhPejsI-YMmnaqA";
-var COLORS=["#29abe2","#0ea5e9","#0d9488","#7c3aed","#db2777","#ea580c"];
-var leads=[],prospects=[],sel=new Set(),activeR=null,cModes={},curPage=1,totalLeads=0;
-var titleTags=["CEO","CTO","VP"];
-var listAccountIds=[];
-var listModality={};
 
-function gc(i){return COLORS[i%COLORS.length];}
+// ── globals ──────────────────────────────────────────────────
+var prospects = [];
+var leads = [];
+var titleTags = ['CEO','CTO','VP'];
+var currentPage = 1;
+var pageSize = 25;
+var totalLeads = 0;
+var apolloKey = '';
+var PROXY = 'https://apollo-proxy.jason-939.workers.dev';
 
-// ââ TAG INPUT âââââââââââââââââââââââââââââââââââââââââââââââââââââ
-function renderTitleTags(){
-  var w=document.getElementById("titles-tags");
-  if(!w)return;
-  var h="";
-  titleTags.forEach(function(t,i){
-    h+='<span style="display:inline-flex;align-items:center;gap:4px;background:#e8f7fd;color:#1da8cc;border:1px solid #cceef9;border-radius:50px;padding:3px 10px;font-size:12px;font-weight:600">';
-    h+=t;
-    h+='<span onclick="removeTitle('+i+')" style="cursor:pointer;font-size:16px;line-height:1;opacity:.7;margin-left:4px">&times;</span></span>';
-  });
-  w.innerHTML=h;
+// ── tab switching ─────────────────────────────────────────────
+function showTab(t) {
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.tab-panel').forEach(function(p) { p.style.display = 'none'; });
+  var btn = document.querySelector('[data-tab="' + t + '"]');
+  if (btn) btn.classList.add('active');
+  var panel = document.getElementById('tab-' + t);
+  if (panel) panel.style.display = 'block';
+  if (t === 'prospects') renderProspects();
+  if (t === 'settings') loadSettingsFromDB();
 }
-function removeTitle(i){titleTags.splice(i,1);renderTitleTags();}
-function initTitles(){
+
+// ── title tags ────────────────────────────────────────────────
+function renderTitleTags() {
+  var box = document.getElementById('title-tags');
+  if (!box) return;
+  box.innerHTML = '';
+  titleTags.forEach(function(tag, i) {
+    var span = document.createElement('span');
+    span.className = 'tag-pill';
+    span.textContent = tag;
+    var x = document.createElement('span');
+    x.className = 'tag-x';
+    x.textContent = '\u00d7';
+    x.onclick = function() { titleTags.splice(i, 1); renderTitleTags(); };
+    span.appendChild(x);
+    box.appendChild(span);
+  });
+}
+
+function initTitles() {
+  var inp = document.getElementById('title-input');
+  if (!inp) return;
   renderTitleTags();
-  var inp=document.getElementById("titles-inp");
-  var box=document.getElementById("titles-box");
-  if(!inp)return;
-  box.addEventListener("click",function(){inp.focus();});
-  inp.addEventListener("keydown",function(e){
-    if(e.key==="Enter"||e.key===","){
+  inp.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
-      var v=inp.value.trim().replace(/,$/,"");
-      if(v&&titleTags.indexOf(v)===-1){titleTags.push(v);renderTitleTags();}
-      inp.value="";
-    }else if(e.key==="Backspace"&&inp.value===""&&titleTags.length){
-      titleTags.pop();renderTitleTags();
+      var v = inp.value.trim().replace(/,$/, '');
+      if (v && titleTags.indexOf(v) === -1) { titleTags.push(v); renderTitleTags(); }
+      inp.value = '';
+    } else if (e.key === 'Backspace' && inp.value === '' && titleTags.length) {
+      titleTags.pop(); renderTitleTags();
     }
   });
-  inp.addEventListener("focus",function(){box.style.borderColor="#29abe2";});
-  inp.addEventListener("blur",function(){box.style.borderColor="";});
 }
 
-// ââ LOAD LISTS ââââââââââââââââââââââââââââââââââââââââââââââââââââ
-async function loadApolloLists(){
-  var s=document.getElementById("f-list");
-  if(!s)return;
-  try{
-    var res=await fetch(PROXY+"/apollo/labels",{headers:{"X-Apollo-Key":APOLLO_KEY}});
-    var data=await res.json();
-    var arr=Array.isArray(data)?data:Object.values(data);
-    s.innerHTML='<option value="">â No list filter â</option>';
-    arr.forEach(function(l){
-      listModality[l._id]=l.modality;
-      var opt=document.createElement("option");
-      opt.value=l._id;
-      opt.textContent=l.name+" ("+(l.cached_count||0).toLocaleString()+") - "+(l.modality==="contacts"?"People":"Companies");
-      s.appendChild(opt);
+// ── Apollo lists ──────────────────────────────────────────────
+function loadApolloLists() {
+  var sel = document.getElementById('f-list');
+  if (!sel) return;
+  var key = apolloKey || (document.getElementById('s-apollo') ? document.getElementById('s-apollo').value : '');
+  if (!key) return;
+  sel.innerHTML = '<option value="">All of Apollo (no list filter)</option>';
+  fetch(PROXY + '/apollo/labels?page=1&per_page=100', {
+    headers: { 'X-Apollo-Key': key }
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var labels = (d.labels || d.contact_labels || []);
+    labels.forEach(function(l) {
+      var opt = document.createElement('option');
+      opt.value = l.id + '|' + (l.modality || 'people');
+      opt.textContent = l.name + ' (' + (l.cached_count || 0) + ') — ' + (l.modality === 'account' ? 'Companies' : 'People');
+      sel.appendChild(opt);
     });
-    if(!arr.length)s.innerHTML='<option value="">No lists found</option>';
-  }catch(e){
-    s.innerHTML='<option value="">Error loading lists</option>';
-  }
+  }).catch(function(e) { console.error('Labels error', e); });
 }
 
-// ââ LIST SELECTION HANDLER ââââââââââââââââââââââââââââââââââââââââ
-async function loadListAccounts(){
-  var listId=document.getElementById("f-list").value;
-  var panel=document.getElementById("accounts-panel");
-  var tableWrap=document.getElementById("leads-table-wrap");
-  var toolbar=document.getElementById("leads-toolbar");
-
-  // No list selected â reset to normal view
-  if(!listId){
-    panel.style.display="none";
-    tableWrap.style.display="";
-    toolbar.style.display="";
-    listAccountIds=[];
-    return;
-  }
-
-  var modality=listModality[listId]||"contacts";
-
-  // People list â load contacts directly, no credits
-  if(modality==="contacts"){
-    panel.style.display="none";
-    tableWrap.style.display="";
-    toolbar.style.display="";
-    await loadPeopleList(listId);
-    return;
-  }
-
-  // Account/company list â show companies free, offer to search contacts
-  var pp=parseInt(document.getElementById("f-perpage").value)||50;
-  panel.style.display="";
-  panel.innerHTML='<div class="loading-bar"><div class="spinner"></div>Loading companies from list â no credits used...</div>';
-  tableWrap.style.display="none";
-  toolbar.style.display="none";
-  document.getElementById("leads-error").innerHTML="";
-
-  try{
-    var res=await fetch(PROXY+"/apollo/accounts/search",{
-      method:"POST",
-      headers:{"Content-Type":"application/json","X-Apollo-Key":APOLLO_KEY},
-      body:JSON.stringify({page:curPage,per_page:pp,label_ids:[listId]})
+function loadListAccounts(listId) {
+  var key = apolloKey || (document.getElementById('s-apollo') ? document.getElementById('s-apollo').value : '');
+  var tbody = document.getElementById('leads-body');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px">Loading list...</td></tr>';
+  fetch(PROXY + '/apollo/accounts/search', {
+    method: 'POST',
+    headers: { 'X-Apollo-Key': key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ page: 1, per_page: 100, label_ids: [listId] })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var accounts = d.accounts || [];
+    leads = accounts.map(function(a) {
+      return {
+        fn: a.name || '',
+        ln: '',
+        title: 'Company',
+        company: a.name || '',
+        companyLocation: (a.city || '') + (a.state ? ', ' + a.state : ''),
+        email: a.phone || '',
+        li: a.linkedin_url || '',
+        apolloId: a.id,
+        isAccount: true
+      };
     });
-    var data=await res.json();
-    if(!data.accounts){
-      panel.innerHTML='<div class="error-box">Error: '+(data.message||"Could not load accounts")+"</div>";
+    totalLeads = leads.length;
+    renderLeads();
+  }).catch(function(e) {
+    console.error('Accounts load error', e);
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:red;padding:20px">Error loading list: ' + e.message + '</td></tr>';
+  });
+}
+
+function loadPeopleList(listId) {
+  var key = apolloKey || (document.getElementById('s-apollo') ? document.getElementById('s-apollo').value : '');
+  var tbody = document.getElementById('leads-body');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px">Loading contacts...</td></tr>';
+  var page = currentPage || 1;
+  fetch(PROXY + '/apollo/contacts/search', {
+    method: 'POST',
+    headers: { 'X-Apollo-Key': key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ page: page, per_page: pageSize, label_ids: [listId] })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.error || d.message) {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:red;padding:20px">Apollo error: ' + (d.error || d.message) + '</td></tr>';
       return;
     }
-    var accounts=data.accounts;
-    var total=data.pagination?data.pagination.total_entries:accounts.length;
-    listAccountIds=accounts.map(function(a){return a.id;});
-
-    var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">'
-      +'<div class="leads-count">Showing <span style="color:var(--cyan)">'+accounts.length+'</span> of <span style="color:var(--cyan)">'+total.toLocaleString()+'</span> companies &mdash; <span style="color:var(--green);font-weight:700">No credits used</span></div>'
-      +'<button class="btn btn-primary btn-sm" onclick="searchContactsInAccounts()">Search Contacts at These Companies &rarr;</button>'
-      +'</div>'
-      +'<div class="leads-table-wrap"><table class="leads-table">'
-      +'<thead><tr><th>Company</th><th>Industry</th><th>Size</th><th>Location</th><th>Phone</th><th>LinkedIn</th></tr></thead><tbody>';
-
-    accounts.forEach(function(a){
-      var loc=[a.city,a.state,a.country].filter(Boolean).join(", ");
-      var size=a.estimated_num_employees?a.estimated_num_employees.toLocaleString()+" emp":"â";
-      var li=a.linkedin_url?'<a href="'+a.linkedin_url+'" target="_blank" style="color:var(--cyan)">View â</a>':"â";
-      html+="<tr>"
-        +'<td><a href="'+(a.website_url||"#")+'" target="_blank" style="color:var(--cyan);font-weight:600">'+a.name+"</a></td>"
-        +'<td style="font-size:12px">'+(a.industry||"â")+"</td>"
-        +"<td>"+size+"</td>"
-        +"<td>"+(loc||"â")+"</td>"
-        +'<td style="font-size:12px">'+(a.phone||"â")+"</td>"
-        +"<td>"+li+"</td>"
-        +"</tr>";
+    var contacts = d.contacts || [];
+    totalLeads = (d.pagination && d.pagination.total_entries) || contacts.length;
+    leads = contacts.map(function(c) {
+      var acct = c.account || {};
+      return {
+        fn: c.first_name || '',
+        ln: c.last_name || '',
+        title: c.title || '',
+        company: c.organization_name || acct.name || '',
+        companyLocation: (acct.city || c.city || '') + (acct.state || c.state ? ', ' + (acct.state || c.state) : ''),
+        email: c.email || '',
+        li: c.linkedin_url || '',
+        phone: c.phone_numbers && c.phone_numbers[0] ? c.phone_numbers[0].sanitized_number : '',
+        apolloId: c.id
+      };
     });
-    html+="</tbody></table></div>";
-
-    if(data.pagination){
-      var pages=Math.ceil(total/pp);
-      html+='<div class="pagination">Page '+curPage+" of "+pages.toLocaleString()+"&nbsp;";
-      if(curPage>1)html+='<a onclick="curPage--;loadListAccounts()">&larr; Prev</a>&nbsp;';
-      if(curPage<pages)html+='<a onclick="curPage++;loadListAccounts()">Next &rarr;</a>';
-      html+="</div>";
-    }
-    panel.innerHTML=html;
-    toast("Loaded "+accounts.length+" companies â no credits used");
-  }catch(e){
-    panel.innerHTML='<div class="error-box">Error: '+e.message+"</div>";
-  }
-}
-
-// ââ LOAD PEOPLE LIST (no credits) ââââââââââââââââââââââââââââââââ
-async function loadPeopleList(listId){
-  var pp=parseInt(document.getElementById("f-perpage").value)||50;
-  var tbody=document.getElementById("leads-tbody");
-  document.getElementById("leads-shown").textContent="0";
-  document.getElementById("leads-total").textContent="0";
-  document.getElementById("leads-error").innerHTML="";
-  tbody.innerHTML='<tr><td colspan="8"><div class="loading-bar"><div class="spinner"></div>Loading saved contacts â no credits used...</div></td></tr>';
-
-  try{
-    var res=await fetch(PROXY+"/apollo/contacts/search",{
-      method:"POST",
-      headers:{"Content-Type":"application/json","X-Apollo-Key":APOLLO_KEY},
-      body:JSON.stringify({page:curPage,per_page:pp,label_ids:[listId]})
-    });
-    var data=await res.json();
-    var people=data.contacts||data.people||[];
-    if(!people.length&&data.message){
-      document.getElementById("leads-error").innerHTML='<div class="error-box">Error: '+data.message+"</div>";
-      tbody.innerHTML="";return;
-    }
-    leads.length=0;
-    people.forEach(function(p){
-      var acct=p.account||{};
-      leads.push({
-        id:p.id,
-        name:(p.first_name||"")+" "+(p.last_name||""),
-        title:p.title||"",
-        company:p.organization_name||acct.name||"",
-        coLocation:[acct.city,acct.state].filter(Boolean).join(", ")||"",
-        size:acct.estimated_num_employees?fmtSz(acct.estimated_num_employees):"",
-        location:[p.city,p.state].filter(Boolean).join(", ")||p.country||"",
-        email:p.email||"",
-        li:p.linkedin_url||"",
-        av:((p.first_name||"?")[0]+(p.last_name||"?")[0]).toUpperCase()
-      });
-    });
-    totalLeads=data.pagination?data.pagination.total_entries:leads.length;
     renderLeads();
-    renderPagination(data.pagination,pp);
-    toast("Loaded "+leads.length+" contacts â no credits used");
-  }catch(e){
-    document.getElementById("leads-error").innerHTML='<div class="error-box">Error: '+e.message+"</div>";
-    tbody.innerHTML="";
-  }
-}
-
-// ââ SEARCH CONTACTS IN ACCOUNT LIST (uses credits) ââââââââââââââââ
-async function searchContactsInAccounts(){
-  if(!listAccountIds.length){toast("No companies loaded");return;}
-  document.getElementById("accounts-panel").style.display="none";
-  document.getElementById("leads-table-wrap").style.display="";
-  document.getElementById("leads-toolbar").style.display="";
-  curPage=1;
-  await runSearch(1,listAccountIds);
-}
-
-// ââ PEOPLE SEARCH âââââââââââââââââââââââââââââââââââââââââââââââââ
-async function runSearch(page,accountIds){
-  curPage=page||1;
-  document.getElementById("accounts-panel").style.display="none";
-  document.getElementById("leads-table-wrap").style.display="";
-  document.getElementById("leads-toolbar").style.display="";
-  var tbody=document.getElementById("leads-tbody");
-  tbody.innerHTML='<tr><td colspan="8"><div class="loading-bar"><div class="spinner"></div>Searching Apollo for contacts...</div></td></tr>';
-  document.getElementById("leads-error").innerHTML="";
-
-  var loc=document.getElementById("f-location").value;
-  var ind=document.getElementById("f-industry").value;
-  var pp=parseInt(document.getElementById("f-perpage").value);
-  var sen=Array.from(document.querySelectorAll(".filter-tag.on")).map(function(t){
-    return t.textContent.toLowerCase().replace(/-/g,"_").replace("c_level","c_suite");
+  }).catch(function(e) {
+    console.error('People list error', e);
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:red;padding:20px">Error: ' + e.message + '</td></tr>';
   });
-  var body={
-    page:curPage,per_page:pp,
-    person_seniorities:sen.length?sen:undefined,
-    organization_locations:loc?[loc]:undefined,
-    contact_email_status:["verified","guessed","unavailable","bounced","pending_manual_fulfillment"]
+}
+
+// ── search Apollo ─────────────────────────────────────────────
+function runSearch() {
+  var listSel = document.getElementById('f-list');
+  var listVal = listSel ? listSel.value : '';
+  if (listVal) {
+    var parts = listVal.split('|');
+    var listId = parts[0];
+    var modality = parts[1] || 'people';
+    if (modality === 'account') { loadListAccounts(listId); return; }
+    else { loadPeopleList(listId); return; }
+  }
+
+  var key = apolloKey || (document.getElementById('s-apollo') ? document.getElementById('s-apollo').value : '');
+  if (!key) { alert('Add your Apollo API key in Settings first.'); return; }
+
+  var seniorities = [];
+  document.querySelectorAll('.seniority-btn.active').forEach(function(b) { seniorities.push(b.dataset.val); });
+
+  var loc = document.getElementById('f-location') ? document.getElementById('f-location').value : '';
+  var ind = document.getElementById('f-industry') ? document.getElementById('f-industry').value : '';
+  var minEmp = document.getElementById('f-min-emp') ? parseInt(document.getElementById('f-min-emp').value) || 1 : 1;
+  var maxEmp = document.getElementById('f-max-emp') ? parseInt(document.getElementById('f-max-emp').value) || 10000 : 10000;
+
+  var tbody = document.getElementById('leads-body');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px">Searching Apollo...</td></tr>';
+
+  var payload = {
+    page: currentPage,
+    per_page: pageSize,
+    person_titles: titleTags,
+    person_seniorities: seniorities.length ? seniorities : undefined,
+    organization_locations: loc ? [loc] : undefined,
+    organization_industry_tag_ids: ind ? [ind] : undefined,
+    organization_num_employees_ranges: [minEmp + ',' + maxEmp]
   };
-  if(titleTags.length)body.person_titles=titleTags;
-  if(ind)body.q_organization_keyword_tags=[ind];
-  if(accountIds&&accountIds.length)body.account_ids=accountIds;
 
-  try{
-    var res=await fetch(PROXY+"/apollo/mixed_people/search",{
-      method:"POST",
-      headers:{"Content-Type":"application/json","X-Apollo-Key":APOLLO_KEY},
-      body:JSON.stringify(body)
-    });
-    var data=await res.json();
-    if(data.error||!data.people){
-      document.getElementById("leads-error").innerHTML='<div class="error-box">Apollo error: '+(data.error||data.message||"Unknown")+"</div>";
-      tbody.innerHTML="";return;
+  fetch(PROXY + '/apollo/mixed_people/search', {
+    method: 'POST',
+    headers: { 'X-Apollo-Key': key, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.error || d.message) {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:red;padding:20px">Apollo error: ' + (d.error || d.message) + '</td></tr>';
+      return;
     }
-    leads.length=0;
-    data.people.forEach(function(p){
-      var org=p.organization||{};
-      leads.push({
-        id:p.id,
-        name:(p.first_name||"")+" "+(p.last_name||""),
-        title:p.title||"",
-        company:org.name||"",
-        coLocation:[org.city,org.state].filter(Boolean).join(", ")||"",
-        size:org.estimated_num_employees?fmtSz(org.estimated_num_employees):"",
-        location:[p.city,p.state].filter(Boolean).join(", ")||p.country||"",
-        email:p.email||"",
-        li:p.linkedin_url||"",
-        av:((p.first_name||"?")[0]+(p.last_name||"?")[0]).toUpperCase()
-      });
+    var people = d.people || d.contacts || [];
+    totalLeads = (d.pagination && d.pagination.total_entries) || people.length;
+    leads = people.map(function(c) {
+      var acct = c.account || c.organization || {};
+      return {
+        fn: c.first_name || '',
+        ln: c.last_name || '',
+        title: c.title || '',
+        company: c.organization_name || acct.name || '',
+        companyLocation: (acct.city || '') + (acct.state ? ', ' + acct.state : ''),
+        email: c.email || '',
+        li: c.linkedin_url || '',
+        phone: c.phone_numbers && c.phone_numbers[0] ? c.phone_numbers[0].sanitized_number : '',
+        apolloId: c.id,
+        empCount: acct.estimated_num_employees || ''
+      };
     });
-    totalLeads=data.pagination?data.pagination.total_entries:leads.length;
     renderLeads();
-    renderPagination(data.pagination,pp);
-    toast("Found "+totalLeads.toLocaleString()+" contacts from Apollo");
-  }catch(e){
-    document.getElementById("leads-error").innerHTML='<div class="error-box">Error: '+e.message+"</div>";
-    tbody.innerHTML="";
-  }
+  }).catch(function(e) {
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:red;padding:20px">Error: ' + e.message + '</td></tr>';
+  });
 }
 
-function fmtSz(n){
-  if(!n)return"";
-  if(n<11)return"1-10";if(n<51)return"11-50";
-  if(n<201)return"51-200";if(n<501)return"201-500";return"500+";
-}
-function renderPagination(pag,pp){
-  if(!pag)return;
-  var pages=Math.ceil(pag.total_entries/pp);
-  var h="Page "+curPage+" of "+pages.toLocaleString()+"&nbsp;";
-  if(curPage>1)h+='<a onclick="curPage--;runSearch(curPage,null)">&larr; Prev</a>&nbsp;';
-  if(curPage<pages)h+='<a onclick="curPage++;runSearch(curPage,null)">Next &rarr;</a>';
-  document.getElementById("pagination").innerHTML=h;
-}
-
-// ââ RENDER LEADS TABLE ââââââââââââââââââââââââââââââââââââââââââââ
-function renderLeads(){
-  var tb=document.getElementById("leads-tbody");
-  if(!leads.length){
-    tb.innerHTML='<tr><td colspan="8"><div class="loading-bar">No contacts found.</div></td></tr>';
+// ── render leads table ────────────────────────────────────────
+function renderLeads() {
+  var tbody = document.getElementById('leads-body');
+  if (!tbody) return;
+  if (!leads.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:#888">No leads found. Run a search or load a list.</td></tr>';
     return;
   }
-  var rows="";
-  for(var i=0;i<leads.length;i++){
-    var l=leads[i];
-    var chk='<input type="checkbox" '+(sel.has(l.id)?"checked ":"")+'onchange="toggleL(\''+l.id+'\',this.checked)"/>';
-    var av='<div class="avatar" style="background:'+gc(i)+'">'+l.av+"</div>";
-    var li=l.li?'<a href="'+l.li+'" target="_blank" style="color:var(--cyan);font-size:12px">View â</a>':"â";
-    var eb=l.email
-      ?'<span style="display:inline-flex;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;background:#dcfce7;color:#15803d">'+l.email+"</span>"
-      :'<span style="display:inline-flex;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;background:#fef9c3;color:#854d0e">Not available</span>';
-    var ab='<div class="icon-btn add" onclick="addP(\''+l.id+'\')" title="Add"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg></div>';
-    var ib='<div class="icon-btn ign" onclick="ignOne(\''+l.id+'\')" title="Ignore"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-width="2"/></svg></div>';
-    rows+="<tr><td>"+chk+"</td>"
-      +'<td><div class="lead-name-cell">'+av+'<div><div class="lead-name">'+l.name+'</div><div class="lead-sub">'+l.title+"</div></div></div></td>"
-      +"<td>"+(l.company||"â")+"</td>"
-      +'<td style="font-size:12px">'+(l.coLocation||"â")+"</td>"
-      +'<td style="font-size:12px">'+(l.size||"â")+"</td>"
-      +"<td>"+li+"</td>"
-      +"<td>"+eb+"</td>"
-      +"<td><div class='action-btns'>"+ab+ib+"</div></td></tr>";
-    // Column order: Name | Company | Co.Location | Size | LinkedIn | Email | Actions
+  tbody.innerHTML = '';
+  leads.forEach(function(l, i) {
+    var tr = document.createElement('tr');
+    var liLink = l.li ? '<a href="' + l.li + '" target="_blank" style="color:#29ABE2">View &#8599;</a>' : '—';
+    var loc = l.companyLocation || '—';
+    tr.innerHTML =
+      '<td><input type="checkbox" class="lead-cb" data-i="' + i + '"></td>' +
+      '<td>' + (l.fn + ' ' + l.ln).trim() + '</td>' +
+      '<td>' + (l.company || '—') + '</td>' +
+      '<td>' + (l.title || '—') + '</td>' +
+      '<td>' + loc + '</td>' +
+      '<td>' + (l.email || '—') + '</td>' +
+      '<td>' + liLink + '</td>' +
+      '<td><button class="btn-sm" onclick="addOne(' + i + ')">+ Add</button> <button class="btn-sm btn-ignore" onclick="ignoreOne(' + i + ')">Ignore</button></td>';
+    tbody.appendChild(tr);
+  });
+  renderPagination();
+}
+
+function renderPagination() {
+  var el = document.getElementById('pagination');
+  if (!el) return;
+  var total = Math.ceil(totalLeads / pageSize);
+  el.innerHTML = 'Page ' + currentPage + ' of ' + (total || 1) + ' &nbsp;';
+  if (currentPage > 1) {
+    var prev = document.createElement('button');
+    prev.className = 'btn-sm';
+    prev.textContent = '< Prev';
+    prev.onclick = function() { currentPage--; runSearch(); };
+    el.appendChild(prev);
   }
-  tb.innerHTML=rows;
-  document.getElementById("leads-shown").textContent=leads.length;
-  document.getElementById("leads-total").textContent=totalLeads.toLocaleString();
-  updateStats();
+  if (currentPage < total) {
+    var nxt = document.createElement('button');
+    nxt.className = 'btn-sm';
+    nxt.textContent = 'Next >';
+    nxt.style.marginLeft = '6px';
+    nxt.onclick = function() { currentPage++; runSearch(); };
+    el.appendChild(nxt);
+  }
 }
 
-function toggleL(id,on){on?sel.add(id):sel.delete(id);}
-function selectAll(cb){leads.forEach(function(l){cb.checked?sel.add(l.id):sel.delete(l.id);});renderLeads();}
-function addP(id){
-  var l=leads.find(function(x){return x.id===id;});
-  if(!l||prospects.find(function(p){return p.id===id;}))return;
-  prospects.push(Object.assign({},l,{stage:"new"}));
-  leads.splice(leads.indexOf(l),1);
-  toast(l.name+" added to Prospects");
-  updateStats();renderLeads();renderProspects();renderRL();renderOutreach();
+// ── add / ignore leads ────────────────────────────────────────
+function addOne(i) {
+  var l = leads[i];
+  if (!l) return;
+  var p = {
+    fn: l.fn, ln: l.ln, title: l.title, company: l.company,
+    companyLocation: l.companyLocation || '', email: l.email,
+    li: l.li, phone: l.phone || '', stage: 'New',
+    apolloId: l.apolloId || '', research: '', outreachStep: 0
+  };
+  prospects.push(p);
+  saveProspectToDB(p);
+  leads.splice(i, 1);
+  renderLeads();
+  showToast('Added ' + p.fn + ' ' + p.ln + ' to Prospects');
 }
-function bulkAdd(){if(!sel.size){toast("Select leads first");return;}Array.from(sel).forEach(addP);sel.clear();}
-function ignOne(id){leads.splice(leads.findIndex(function(l){return l.id===id;}),1);renderLeads();toast("Lead ignored");}
-function bulkIgnore(){sel.forEach(function(id){leads.splice(leads.findIndex(function(l){return l.id===id;}),1);});sel.clear();renderLeads();}
-function filterTable(q){document.querySelectorAll("#leads-tbody tr").forEach(function(r){r.style.display=r.textContent.toLowerCase().includes(q.toLowerCase())?"":"none";});}
 
-// ââ PROSPECTS âââââââââââââââââââââââââââââââââââââââââââââââââââââ
-function renderProspects(filter){
-  var g=document.getElementById("prospect-grid");
-  var list=filter?prospects.filter(function(p){return sName(p.stage)===filter;}):prospects;
-  if(!list.length){
-    g.innerHTML='<div style="color:var(--text2);grid-column:1/-1;padding:32px;text-align:center">'+(prospects.length?"No match.":"No prospects yet. Add leads from Find Leads.")+"</div>";
+function ignoreOne(i) {
+  leads.splice(i, 1);
+  renderLeads();
+}
+
+function bulkAdd() {
+  var checked = document.querySelectorAll('.lead-cb:checked');
+  var indices = [];
+  checked.forEach(function(cb) { indices.push(parseInt(cb.dataset.i)); });
+  indices.sort(function(a, b) { return b - a; });
+  indices.forEach(function(i) {
+    var l = leads[i];
+    var p = {
+      fn: l.fn, ln: l.ln, title: l.title, company: l.company,
+      companyLocation: l.companyLocation || '', email: l.email,
+      li: l.li, phone: l.phone || '', stage: 'New',
+      apolloId: l.apolloId || '', research: '', outreachStep: 0
+    };
+    prospects.push(p);
+    saveProspectToDB(p);
+    leads.splice(i, 1);
+  });
+  renderLeads();
+  showToast('Added ' + indices.length + ' prospects');
+}
+
+function bulkIgnore() {
+  var checked = document.querySelectorAll('.lead-cb:checked');
+  var indices = [];
+  checked.forEach(function(cb) { indices.push(parseInt(cb.dataset.i)); });
+  indices.sort(function(a, b) { return b - a; });
+  indices.forEach(function(i) { leads.splice(i, 1); });
+  renderLeads();
+}
+
+// ── prospects ─────────────────────────────────────────────────
+var STAGES = ['New', 'Researching', 'Messaged', 'Replied', 'Call Scheduled'];
+
+function renderProspects() {
+  var wrap = document.getElementById('prospect-cards');
+  if (!wrap) return;
+  var filter = document.getElementById('stage-filter') ? document.getElementById('stage-filter').value : '';
+  var list = filter ? prospects.filter(function(p) { return p.stage === filter; }) : prospects;
+  if (!list.length) {
+    wrap.innerHTML = '<p style="color:#888;text-align:center;padding:40px">No prospects yet. Add leads from Find Leads tab.</p>';
     return;
   }
-  var html="";
-  list.forEach(function(p,i){
-    html+='<div class="prospect-card"><div class="p-card-hdr">'
-      +'<div class="avatar" style="background:'+gc(i)+';width:44px;height:44px;font-size:14px;position:relative">'+p.av+"</div>"
-      +'<div style="position:relative"><div class="p-name">'+p.name+"</div><div class='p-role'>"+p.title+"</div><div class='p-co'>"+p.company+"</div></div>"
-      +'<span class="stage-badge s'+p.stage[0]+'" style="margin-left:auto;position:relative">'+sName(p.stage)+"</span></div>"
-      +'<div class="prospect-body"><div class="prospect-meta">'
-      +'<div class="meta-chip">'+(p.coLocation||p.location||"")+"</div>"
-      +(p.size?'<div class="meta-chip">'+p.size+"</div>":"")
-      +(p.email?'<div class="meta-chip">'+p.email+"</div>":"")
-      +"</div>"
-      +(p.aiS?'<div class="ai-box"><strong>AI: </strong>'+p.aiS+"</div>":'<div class="ai-box" style="color:var(--gray3);border-left-color:var(--gray3)">AI research not yet run</div>')
-      +'<div class="prospect-actions">'
-      +'<button class="btn btn-primary btn-sm" onclick="goR(\''+p.id+'\')">Research</button>'
-      +'<button class="btn btn-outline btn-sm" onclick="goO(\''+p.id+'\')">Outreach</button>'
-      +'<button class="btn btn-ghost btn-sm" onclick="nextStage(\''+p.id+'\')">Next Stage</button>'
-      +"</div></div></div>";
+  wrap.innerHTML = '';
+  list.forEach(function(p, i) {
+    var card = document.createElement('div');
+    card.className = 'prospect-card';
+    var stageOpts = STAGES.map(function(s) {
+      return '<option value="' + s + '"' + (p.stage === s ? ' selected' : '') + '>' + s + '</option>';
+    }).join('');
+    card.innerHTML =
+      '<div class="card-header"><div class="card-name">' + p.fn + ' ' + p.ln + '</div>' +
+      '<div class="card-title">' + p.title + '</div>' +
+      '<div class="card-company">' + p.company + (p.companyLocation ? ' &bull; ' + p.companyLocation : '') + '</div></div>' +
+      '<div class="card-body">' +
+      '<select class="stage-select" onchange="setStage(' + i + ',this.value)">' + stageOpts + '</select>' +
+      (p.research ? '<div class="research-snippet">' + p.research.substring(0, 100) + '...</div>' : '') +
+      '<div class="card-actions">' +
+      '<button class="btn-sm" onclick="openResearch(' + i + ')">&#9881; Research</button> ' +
+      (p.li ? '<a class="btn-sm" href="' + p.li + '" target="_blank">LinkedIn</a> ' : '') +
+      '<button class="btn-sm btn-ignore" onclick="deleteProspect(' + i + ')">Remove</button>' +
+      '</div></div>';
+    wrap.appendChild(card);
   });
-  g.innerHTML=html;
-  document.getElementById("stat-prospects").textContent=prospects.length;
 }
-function filterProspects(val){renderProspects(val);}
-function sName(s){return{new:"New",research:"Researching",messaged:"Messaged",replied:"Replied",call:"Call Sched."}[s]||s;}
-function nextStage(id){var p=prospects.find(function(x){return x.id===id;});var st=["new","research","messaged","replied","call"];p.stage=st[(st.indexOf(p.stage)+1)%st.length];renderProspects();}
-function goR(id){showPage("research");setTimeout(function(){selectR(id);},50);}
-function goO(id){showPage("outreach");setTimeout(function(){selectO(id);},50);}
 
-// ââ RESEARCH ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-function renderRL(){
-  var html="";
-  prospects.forEach(function(p,i){
-    html+='<div class="r-item '+(activeR===p.id?"active":"")+'" onclick="selectR(\''+p.id+'\')">'
-      +'<div class="avatar" style="background:'+gc(i)+';width:34px;height:34px;font-size:12px;flex-shrink:0">'+p.av+"</div>"
-      +'<div><div class="r-item-name">'+p.name+(p.aiS?" â":"")+"</div><div class='r-item-co'>"+p.company+"</div></div></div>";
+function setStage(i, stage) {
+  var p = prospects[i];
+  if (!p) return;
+  p.stage = stage;
+  updateProspectInDB(p);
+  renderProspects();
+}
+
+function deleteProspect(i) {
+  var p = prospects[i];
+  if (!p) return;
+  deleteProspectFromDB(p.id);
+  prospects.splice(i, 1);
+  renderProspects();
+}
+
+function openResearch(i) {
+  var p = prospects[i];
+  if (!p) return;
+  var panel = document.getElementById('research-panel');
+  if (panel) {
+    panel.style.display = 'block';
+    document.getElementById('r-name') && (document.getElementById('r-name').textContent = p.fn + ' ' + p.ln + ' — ' + p.company);
+    document.getElementById('r-notes') && (document.getElementById('r-notes').value = p.research || '');
+    panel.dataset.idx = i;
+  }
+  showTab('research');
+}
+
+function saveResearch() {
+  var panel = document.getElementById('research-panel');
+  if (!panel) return;
+  var i = parseInt(panel.dataset.idx);
+  var p = prospects[i];
+  if (!p) return;
+  p.research = document.getElementById('r-notes') ? document.getElementById('r-notes').value : '';
+  updateProspectInDB(p);
+  showToast('Research saved');
+}
+
+// ── AI research ───────────────────────────────────────────────
+function runAIResearch() {
+  var panel = document.getElementById('research-panel');
+  if (!panel) return;
+  var i = parseInt(panel.dataset.idx);
+  var p = prospects[i];
+  if (!p) return;
+
+  var anthropicKey = document.getElementById('s-anthropic') ? document.getElementById('s-anthropic').value : '';
+  if (!anthropicKey) { alert('Add your Anthropic API key in Settings.'); return; }
+
+  var btn = document.getElementById('run-research-btn');
+  if (btn) btn.textContent = 'Researching...';
+
+  var prompt = 'Research this sales prospect and write a friendly LinkedIn connection request message following the 4-step outreach rule (connect first, no pitch).\n\nProspect:\nName: ' + p.fn + ' ' + p.ln + '\nTitle: ' + p.title + '\nCompany: ' + p.company + '\nLocation: ' + (p.companyLocation || 'unknown') + '\n\nProvide:\n1. 3-4 key research insights about this person/company\n2. A short friendly LinkedIn connection request (under 300 chars, no pitch, just genuine interest)\n3. A follow-up thank you message for after they accept';
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': anthropicKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-5',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var txt = d.content && d.content[0] ? d.content[0].text : 'No response';
+    var notes = document.getElementById('r-notes');
+    if (notes) notes.value = txt;
+    p.research = txt;
+    updateProspectInDB(p);
+    if (btn) btn.textContent = '&#9889; Run AI Research';
+  }).catch(function(e) {
+    alert('AI research error: ' + e.message);
+    if (btn) btn.textContent = '&#9889; Run AI Research';
   });
-  document.getElementById("r-list-items").innerHTML=html;
 }
-function selectR(id){
-  activeR=id;renderRL();
-  var p=prospects.find(function(x){return x.id===id;});
-  if(p.aiS){showRResult(p);return;}
-  document.getElementById("r-pane").innerHTML=
-    '<div class="r-card"><div class="r-card-top">'
-    +'<div class="avatar" style="background:'+gc(prospects.indexOf(p))+';width:52px;height:52px;font-size:17px;position:relative">'+p.av+"</div>"
-    +'<div style="position:relative"><div style="font-size:18px;font-weight:800;color:#fff">'+p.name+"</div>"
-    +'<div style="font-size:13px;color:#a0b4cc">'+p.title+" at "+p.company+"</div></div></div>"
-    +'<div class="r-card-body"><div class="ai-load"><div class="dot-pulse"><span></span><span></span><span></span></div>Ready to research '+p.name+"</div>"
-    +'<button class="btn btn-primary" style="margin-top:12px" onclick="runR(\''+p.id+'\')">Run AI Research Now</button></div></div>';
+
+// ── settings ──────────────────────────────────────────────────
+function saveSettings() {
+  var ak = document.getElementById('s-apollo') ? document.getElementById('s-apollo').value.trim() : '';
+  var anth = document.getElementById('s-anthropic') ? document.getElementById('s-anthropic').value.trim() : '';
+  if (ak) { apolloKey = ak; saveSettingToDB('apolloKey', ak); }
+  if (anth) saveSettingToDB('anthropicKey', anth);
+  showToast('Settings saved to database');
+  loadApolloLists();
 }
-function runR(id){
-  var p=prospects.find(function(x){return x.id===id;});
-  var ld=document.querySelector(".ai-load");
-  if(ld)ld.innerHTML='<div class="dot-pulse"><span></span><span></span><span></span></div> Generating 4-step LinkedIn sequence...';
-  setTimeout(function(){
-    var first=p.name.split(" ")[0];
-    var loc=p.coLocation||p.location||"the Denver area";
-    var co=p.company;
-    p.aiS=co+" is in your target area. "+p.name+" is a decision-maker â use the 4-step sequence to build rapport before introducing Workplace IT.";
-    p.insights=[
-      {t:"Never pitch on the connection request â just connect"},
-      {t:"Thank them first, then start a real conversation"},
-      {t:"Introduce what you do only after rapport is established"},
-      {t:p.email?"Email also available for follow-up: "+p.email:"LinkedIn is the primary channel"}
-    ];
-    // 4-step messages
-    p.msg1="Hi "+first+", I work with businesses in "+loc+" and came across your profile â would love to connect!";
-    p.msg2="Thanks for connecting, "+first+"! Really appreciate it. Hope things are going well at "+co+".";
-    p.msg3="Hey "+first+", I'm curious â what's been the biggest challenge on the IT or operations side at "+co+" lately? Always trying to understand what local businesses are dealing with.";
-    p.msg4="Thanks for sharing that, "+first+". We actually help companies in "+loc+" take IT completely off their plate â 24/7 monitoring, local team, no surprises. Might be worth a quick 15-min chat to see if there's a fit. Would that be useful?";
-    // default msg for outreach tab (step 1)
-    p.msg=p.msg1;
-    p.msgStep=1;
-    p.stage="research";
-    showRResult(p);renderProspects();renderRL();updateStats();
-    toast("4-step sequence ready for "+p.name);
-  },2000);
+
+// ── toast ─────────────────────────────────────────────────────
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.style.opacity = '1';
+  setTimeout(function() { t.style.opacity = '0'; }, 3000);
 }
-function showRResult(p){
-  var html='<div class="r-card"><div class="r-card-top">'
-    +'<div class="avatar" style="background:'+gc(prospects.indexOf(p))+';width:52px;height:52px;font-size:17px;position:relative">'+p.av+"</div>"
-    +'<div style="position:relative"><div style="font-size:18px;font-weight:800;color:#fff">'+p.name+"</div>"
-    +'<div style="font-size:13px;color:#a0b4cc">'+p.title+" at "+p.company+"</div>"
-    +(p.email?'<div style="font-size:12px;color:#29abe2;margin-top:2px">'+p.email+"</div>":"")
-    +"</div>"
-    +'<button class="btn btn-primary btn-sm" style="margin-left:auto;position:relative" onclick="goO(\''+p.id+'\')">Compose Outreach</button></div>'
-    +'<div class="r-card-body"><div class="r-section"><h3>AI Insights</h3>';
-  (p.insights||[]).forEach(function(ins){
-    html+='<div class="r-insight"><span style="margin-right:6px;color:#29abe2">&#10022;</span><span>'+ins.t+"</span></div>";
+
+// ── seniority toggle ──────────────────────────────────────────
+function toggleSeniority(btn) {
+  btn.classList.toggle('active');
+}
+
+// ── init ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  initTitles();
+  showTab('leads');
+  loadProspectsFromDB();
+  loadSettingsFromDB().then(function() {
+    loadApolloLists();
   });
-  html+="</div><div class='r-section'><h3>Suggested LinkedIn Message</h3>"
-    +'<div class="msg-box"><p>'+p.msg+"</p></div>"
-    +'<div style="display:flex;gap:8px;margin-top:10px">'
-    +'<button class="btn btn-primary btn-sm" onclick="goO(\''+p.id+'\')">Use This Message</button>'
-    +'<button class="btn btn-ghost btn-sm" onclick="regenR(\''+p.id+'\')">Regenerate</button>'
-    +"</div></div></div></div>";
-  document.getElementById("r-pane").innerHTML=html;
-}
-function runAllResearch(){
-  prospects.filter(function(p){return !p.aiS;}).forEach(function(p){selectR(p.id);setTimeout(function(){runR(p.id);},200);});
-  toast("Running AI research on all prospects...");
-}
-function regenR(id){var p=prospects.find(function(x){return x.id===id;});p.aiS=null;selectR(id);setTimeout(function(){runR(id);},100);}
-
-// ââ OUTREACH ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-function renderOutreach(){
-  var html="";
-  prospects.forEach(function(p,i){
-    html+='<div class="o-item" onclick="selectO(\''+p.id+'\')">'
-      +'<div class="avatar" style="background:'+gc(i)+';width:36px;height:36px;font-size:12px;flex-shrink:0">'+p.av+"</div>"
-      +'<div class="o-item-info"><div class="o-item-name">'+p.name+"</div>"
-      +'<div class="o-item-prev">'+(p.msg?p.msg.substring(0,50)+"...":"No message yet")+"</div></div></div>";
-  });
-  document.getElementById("o-items").innerHTML=html;
-  document.getElementById("o-count").textContent=prospects.length;
-}
-function selectO(id){
-  var p=prospects.find(function(x){return x.id===id;});
-  var mode=cModes[id]||"linkedin";
-  var html='<div class="compose-card"><div class="c-hdr"><div class="c-hdr-title">'
-    +'<div class="avatar" style="background:'+gc(prospects.indexOf(p))+';width:28px;height:28px;font-size:11px">'+p.av+"</div>"
-    +p.name+" - "+p.company+"</div>"
-    +'<div class="c-tabs">'
-    +'<div class="c-tab '+(mode==="linkedin"?"active":"")+'" onclick="setMode(\''+p.id+'\',\'linkedin\')">LinkedIn</div>'
-    +'<div class="c-tab '+(mode==="email"?"active":"")+'" onclick="setMode(\''+p.id+'\',\'email\')">Email</div>'
-    +"</div></div>"
-    +'<div class="c-body">'
-    +(mode==="email"?'<input class="filter-input" placeholder="Subject..." style="margin-bottom:8px" value="Re: '+p.company+'"/>':"")
-    +'<textarea class="c-textarea" id="msg-'+p.id+'" oninput="updCC(\''+p.id+'\')">'+(p.msg||"")+"</textarea></div>"
-    +'<div class="c-footer"><span class="char-count" id="cc-'+p.id+'">'+(p.msg||"").length+" chars"+(mode==="linkedin"?" / 300 limit":"")+"</span>"
-    +'<div style="display:flex;gap:8px">'
-    +'<button class="btn btn-ghost btn-sm" onclick="regenO(\''+p.id+'\')">Regenerate</button>'
-    +'<button class="btn btn-primary btn-sm" onclick="sendO(\''+p.id+'\',\''+mode+'\')">'+(mode==="linkedin"?"Open LinkedIn":"Send Email")+"</button>"
-    +"</div></div></div>"
-    +'<div class="seq-card"><div class="c-hdr" style="padding:12px 18px"><div class="c-hdr-title" style="font-size:13px">Follow-up Sequence</div><button class="btn btn-outline btn-sm">+ Add Step</button></div>'
-    +'<div class="seq-item"><div class="seq-num">1</div><div style="flex:1">LinkedIn intro<br><span style="font-size:11px;color:var(--text2)">Day 1 - Manual</span></div>'
-    +'<span class="badge '+(p.stage==="messaged"||p.stage==="replied"?"badge-verified":"badge-pending")+'">'+(p.stage==="messaged"||p.stage==="replied"?"Sent":"Pending")+"</span></div>"
-    +'<div class="seq-item"><div class="seq-num">2</div><div style="flex:1">Follow-up email<br><span style="font-size:11px;color:var(--text2)">Day 4 - Office 365</span></div><span class="badge badge-pending">Pending</span></div>'
-    +'<div class="seq-item"><div class="seq-num">3</div><div style="flex:1">Soft close<br><span style="font-size:11px;color:var(--text2)">Day 10 - Office 365</span></div><span class="badge badge-pending">Pending</span></div></div>';
-  document.getElementById("o-pane").innerHTML=html;
-}
-function setMode(id,m){cModes[id]=m;selectO(id);}
-function updCC(id){var ta=document.getElementById("msg-"+id);var cc=document.getElementById("cc-"+id);if(ta&&cc)cc.textContent=ta.value.length+" chars";}
-function sendO(id,mode){var p=prospects.find(function(x){return x.id===id;});p.stage="messaged";if(mode==="linkedin"&&p.li)window.open(p.li,"_blank");renderProspects();renderOutreach();updateStats();toast(mode==="linkedin"?"Opening LinkedIn for "+p.name+"...":"Email queued for "+p.name);}
-function regenO(id){var p=prospects.find(function(x){return x.id===id;});p.msg="Hi "+p.name.split(" ")[0]+", saw your team is growing at "+p.company+". We keep IT off your plate - 24/7, no surprises. Worth a quick call?";selectO(id);}
-
-// ââ UTILS âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-function updateStats(){
-  document.getElementById("stat-leads").textContent=leads.length+prospects.length;
-  document.getElementById("stat-prospects").textContent=prospects.length;
-  document.getElementById("stat-messaged").textContent=prospects.filter(function(p){return p.stage==="messaged"||p.stage==="replied"||p.stage==="call";}).length;
-  document.getElementById("stat-replies").textContent=prospects.filter(function(p){return p.stage==="replied"||p.stage==="call";}).length;
-}
-function toggleTag(el){el.classList.toggle("on");}
-function toggleEl(el){el.classList.toggle("on");}
-function showPage(name){
-  document.querySelectorAll(".page").forEach(function(p){p.classList.remove("active");});
-  document.querySelectorAll(".nav-tab").forEach(function(t){t.classList.remove("active");});
-  document.getElementById("page-"+name).classList.add("active");
-  var tabs={find:0,prospects:1,research:2,outreach:3,settings:4};
-  document.querySelectorAll(".nav-tab")[tabs[name]].classList.add("active");
-  if(name==="prospects")renderProspects();
-  if(name==="research")renderRL();
-  if(name==="outreach")renderOutreach();
-}
-function toast(msg){var t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._to);t._to=setTimeout(function(){t.classList.remove("show");},3000);}
-
-initTitles();
-loadApolloLists();
-
-// Auto-init DB on load
-if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", function(){ loadProspectsFromDB(); loadSettingsFromDB(); }); } else { loadProspectsFromDB(); loadSettingsFromDB(); }
+});
