@@ -22,40 +22,24 @@ function loadProspectsFromDB() {
     if (!Array.isArray(rows)) { console.error('DB load failed', rows); return; }
     prospects = rows.map(function(r) {
       return {
-        id: r.id,
-        fn: r.first_name || '',
-        ln: r.last_name || '',
-        title: r.title || '',
-        company: r.company || '',
-        companyLocation: r.company_location || '',
-        email: r.email || '',
-        li: r.linkedin_url || '',
-        phone: r.phone || '',
-        stage: r.stage || 'New',
-        apolloId: r.apollo_id || '',
-        research: r.research_notes || '',
-        outreachStep: r.outreach_step || 0
+        id: r.id, fn: r.first_name || '', ln: r.last_name || '',
+        title: r.title || '', company: r.company || '',
+        companyLocation: r.company_location || '', email: r.email || '',
+        li: r.linkedin_url || '', phone: r.phone || '',
+        stage: r.stage || 'New', apolloId: r.apollo_id || '',
+        research: r.research_notes || '', outreachStep: r.outreach_step || 0
       };
     });
-    // Only render if DOM is ready and element exists
-    var wrap = document.getElementById('prospect-cards');
-    if (wrap) renderProspects();
+    if (document.getElementById('prospect-cards')) renderProspects();
   }).catch(function(e) { console.error('DB load error', e); });
 }
 
 function saveProspectToDB(p) {
   return supaFetch('prospects', 'POST', {
-    first_name: p.fn,
-    last_name: p.ln,
-    title: p.title,
-    company: p.company,
-    company_location: p.companyLocation || '',
-    email: p.email,
-    linkedin_url: p.li,
-    phone: p.phone || '',
-    stage: p.stage || 'New',
-    apollo_id: p.apolloId || '',
-    research_notes: p.research || '',
+    first_name: p.fn, last_name: p.ln, title: p.title, company: p.company,
+    company_location: p.companyLocation || '', email: p.email,
+    linkedin_url: p.li, phone: p.phone || '', stage: p.stage || 'New',
+    apollo_id: p.apolloId || '', research_notes: p.research || '',
     outreach_step: p.outreachStep || 0
   }).then(function(rows) {
     if (Array.isArray(rows) && rows[0]) { p.id = rows[0].id; }
@@ -65,17 +49,10 @@ function saveProspectToDB(p) {
 function updateProspectInDB(p) {
   if (!p.id) return saveProspectToDB(p);
   return supaFetch('prospects?id=eq.' + p.id, 'PATCH', {
-    first_name: p.fn,
-    last_name: p.ln,
-    title: p.title,
-    company: p.company,
-    company_location: p.companyLocation || '',
-    email: p.email,
-    linkedin_url: p.li,
-    phone: p.phone || '',
-    stage: p.stage || 'New',
-    research_notes: p.research || '',
-    outreach_step: p.outreachStep || 0
+    first_name: p.fn, last_name: p.ln, title: p.title, company: p.company,
+    company_location: p.companyLocation || '', email: p.email,
+    linkedin_url: p.li, phone: p.phone || '', stage: p.stage || 'New',
+    research_notes: p.research || '', outreach_step: p.outreachStep || 0
   }).catch(function(e) { console.error('DB update error', e); });
 }
 
@@ -86,10 +63,12 @@ function deleteProspectFromDB(id) {
 }
 
 function saveSettingToDB(key, value) {
-  return supaFetch('settings', 'POST', { key: key, value: value })
-    .catch(function() {
-      return supaFetch('settings?key=eq.' + key, 'PATCH', { value: value });
-    });
+  supaFetch('settings?key=eq.' + key, 'PATCH', { value: value })
+    .then(function(r) {
+      if (!Array.isArray(r) || r.length === 0) {
+        return supaFetch('settings', 'POST', { key: key, value: value });
+      }
+    }).catch(function(e) { console.error('Settings save error', e); });
 }
 
 function loadSettingsFromDB() {
@@ -108,12 +87,10 @@ function loadSettingsFromDB() {
     });
   }).catch(function(e) { console.error('Settings load error', e); });
 }
-
 // ============================================================
 // END SUPABASE LAYER
 // ============================================================
 
-// ── globals ──────────────────────────────────────────────────
 var prospects = [];
 var leads = [];
 var titleTags = ['CEO','CTO','VP'];
@@ -123,7 +100,6 @@ var totalLeads = 0;
 var apolloKey = '';
 var PROXY = 'https://apollo-proxy.jason-939.workers.dev';
 
-// ── tab switching ─────────────────────────────────────────────
 function showTab(t) {
   document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
   document.querySelectorAll('.tab-panel').forEach(function(p) { p.style.display = 'none'; });
@@ -135,7 +111,6 @@ function showTab(t) {
   if (t === 'settings') loadSettingsFromDB();
 }
 
-// ── title tags ────────────────────────────────────────────────
 function renderTitleTags() {
   var box = document.getElementById('title-tags');
   if (!box) return;
@@ -160,7 +135,7 @@ function initTitles() {
   inp.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
-      var v = inp.value.trim().replace(/,$/, '');
+      var v = inp.value.trim().replace(/,$/,'');
       if (v && titleTags.indexOf(v) === -1) { titleTags.push(v); renderTitleTags(); }
       inp.value = '';
     } else if (e.key === 'Backspace' && inp.value === '' && titleTags.length) {
@@ -169,7 +144,6 @@ function initTitles() {
   });
 }
 
-// ── Apollo lists ──────────────────────────────────────────────
 function loadApolloLists() {
   var sel = document.getElementById('f-list');
   if (!sel) return;
@@ -179,7 +153,7 @@ function loadApolloLists() {
   fetch(PROXY + '/apollo/labels?page=1&per_page=100', {
     headers: { 'X-Apollo-Key': key }
   }).then(function(r) { return r.json(); }).then(function(d) {
-    var labels = (d.labels || d.contact_labels || []);
+    var labels = d.labels || d.contact_labels || [];
     labels.forEach(function(l) {
       var opt = document.createElement('option');
       opt.value = l.id + '|' + (l.modality || 'people');
@@ -201,22 +175,16 @@ function loadListAccounts(listId) {
     var accounts = d.accounts || [];
     leads = accounts.map(function(a) {
       return {
-        fn: a.name || '',
-        ln: '',
-        title: 'Company',
-        company: a.name || '',
+        fn: a.name || '', ln: '', title: 'Company', company: a.name || '',
         companyLocation: (a.city || '') + (a.state ? ', ' + a.state : ''),
-        email: a.phone || '',
-        li: a.linkedin_url || '',
-        apolloId: a.id,
-        isAccount: true
+        email: a.phone || '', li: a.linkedin_url || '',
+        apolloId: a.id, isAccount: true
       };
     });
     totalLeads = leads.length;
     renderLeads();
   }).catch(function(e) {
-    console.error('Accounts load error', e);
-    if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:red;padding:20px">Error loading list: ' + e.message + '</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:red;padding:20px">Error: ' + e.message + '</td></tr>';
   });
 }
 
@@ -224,11 +192,10 @@ function loadPeopleList(listId) {
   var key = apolloKey || (document.getElementById('s-apollo') ? document.getElementById('s-apollo').value : '');
   var tbody = document.getElementById('leads-body');
   if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px">Loading contacts...</td></tr>';
-  var page = currentPage || 1;
   fetch(PROXY + '/apollo/contacts/search', {
     method: 'POST',
     headers: { 'X-Apollo-Key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ page: page, per_page: pageSize, label_ids: [listId] })
+    body: JSON.stringify({ page: currentPage || 1, per_page: pageSize, label_ids: [listId] })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.error || d.message) {
       if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:red;padding:20px">Apollo error: ' + (d.error || d.message) + '</td></tr>';
@@ -239,64 +206,46 @@ function loadPeopleList(listId) {
     leads = contacts.map(function(c) {
       var acct = c.account || {};
       return {
-        fn: c.first_name || '',
-        ln: c.last_name || '',
-        title: c.title || '',
+        fn: c.first_name || '', ln: c.last_name || '', title: c.title || '',
         company: c.organization_name || acct.name || '',
-        companyLocation: (acct.city || c.city || '') + (acct.state || c.state ? ', ' + (acct.state || c.state) : ''),
-        email: c.email || '',
-        li: c.linkedin_url || '',
+        companyLocation: (acct.city || c.city || '') + ((acct.state || c.state) ? ', ' + (acct.state || c.state) : ''),
+        email: c.email || '', li: c.linkedin_url || '',
         phone: c.phone_numbers && c.phone_numbers[0] ? c.phone_numbers[0].sanitized_number : '',
         apolloId: c.id
       };
     });
     renderLeads();
   }).catch(function(e) {
-    console.error('People list error', e);
     if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:red;padding:20px">Error: ' + e.message + '</td></tr>';
   });
 }
 
-// ── search Apollo ─────────────────────────────────────────────
 function runSearch() {
   var listSel = document.getElementById('f-list');
   var listVal = listSel ? listSel.value : '';
   if (listVal) {
     var parts = listVal.split('|');
-    var listId = parts[0];
-    var modality = parts[1] || 'people';
-    if (modality === 'account') { loadListAccounts(listId); return; }
-    else { loadPeopleList(listId); return; }
+    if (parts[1] === 'account') { loadListAccounts(parts[0]); return; }
+    else { loadPeopleList(parts[0]); return; }
   }
-
   var key = apolloKey || (document.getElementById('s-apollo') ? document.getElementById('s-apollo').value : '');
   if (!key) { alert('Add your Apollo API key in Settings first.'); return; }
-
   var seniorities = [];
   document.querySelectorAll('.seniority-btn.active').forEach(function(b) { seniorities.push(b.dataset.val); });
-
   var loc = document.getElementById('f-location') ? document.getElementById('f-location').value : '';
-  var ind = document.getElementById('f-industry') ? document.getElementById('f-industry').value : '';
-  var minEmp = document.getElementById('f-min-emp') ? parseInt(document.getElementById('f-min-emp').value) || 1 : 1;
-  var maxEmp = document.getElementById('f-max-emp') ? parseInt(document.getElementById('f-max-emp').value) || 10000 : 10000;
-
+  var minEmp = parseInt(document.getElementById('f-min-emp') ? document.getElementById('f-min-emp').value : 1) || 1;
+  var maxEmp = parseInt(document.getElementById('f-max-emp') ? document.getElementById('f-max-emp').value : 10000) || 10000;
   var tbody = document.getElementById('leads-body');
   if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px">Searching Apollo...</td></tr>';
-
-  var payload = {
-    page: currentPage,
-    per_page: pageSize,
-    person_titles: titleTags,
-    person_seniorities: seniorities.length ? seniorities : undefined,
-    organization_locations: loc ? [loc] : undefined,
-    organization_industry_tag_ids: ind ? [ind] : undefined,
-    organization_num_employees_ranges: [minEmp + ',' + maxEmp]
-  };
-
   fetch(PROXY + '/apollo/mixed_people/search', {
     method: 'POST',
     headers: { 'X-Apollo-Key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      page: currentPage, per_page: pageSize, person_titles: titleTags,
+      person_seniorities: seniorities.length ? seniorities : undefined,
+      organization_locations: loc ? [loc] : undefined,
+      organization_num_employees_ranges: [minEmp + ',' + maxEmp]
+    })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.error || d.message) {
       if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:red;padding:20px">Apollo error: ' + (d.error || d.message) + '</td></tr>';
@@ -307,16 +256,12 @@ function runSearch() {
     leads = people.map(function(c) {
       var acct = c.account || c.organization || {};
       return {
-        fn: c.first_name || '',
-        ln: c.last_name || '',
-        title: c.title || '',
+        fn: c.first_name || '', ln: c.last_name || '', title: c.title || '',
         company: c.organization_name || acct.name || '',
         companyLocation: (acct.city || '') + (acct.state ? ', ' + acct.state : ''),
-        email: c.email || '',
-        li: c.linkedin_url || '',
+        email: c.email || '', li: c.linkedin_url || '',
         phone: c.phone_numbers && c.phone_numbers[0] ? c.phone_numbers[0].sanitized_number : '',
-        apolloId: c.id,
-        empCount: acct.estimated_num_employees || ''
+        apolloId: c.id, empCount: acct.estimated_num_employees || ''
       };
     });
     renderLeads();
@@ -325,25 +270,23 @@ function runSearch() {
   });
 }
 
-// ── render leads table ────────────────────────────────────────
 function renderLeads() {
   var tbody = document.getElementById('leads-body');
   if (!tbody) return;
   if (!leads.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:#888">No leads found. Run a search or load a list.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:#888">No leads found.</td></tr>';
     return;
   }
   tbody.innerHTML = '';
   leads.forEach(function(l, i) {
     var tr = document.createElement('tr');
     var liLink = l.li ? '<a href="' + l.li + '" target="_blank" style="color:#29ABE2">View &#8599;</a>' : '—';
-    var loc = l.companyLocation || '—';
     tr.innerHTML =
       '<td><input type="checkbox" class="lead-cb" data-i="' + i + '"></td>' +
       '<td>' + (l.fn + ' ' + l.ln).trim() + '</td>' +
       '<td>' + (l.company || '—') + '</td>' +
       '<td>' + (l.title || '—') + '</td>' +
-      '<td>' + loc + '</td>' +
+      '<td>' + (l.companyLocation || '—') + '</td>' +
       '<td>' + (l.email || '—') + '</td>' +
       '<td>' + liLink + '</td>' +
       '<td><button class="btn-sm" onclick="addOne(' + i + ')">+ Add</button> <button class="btn-sm btn-ignore" onclick="ignoreOne(' + i + ')">Ignore</button></td>';
@@ -359,31 +302,25 @@ function renderPagination() {
   el.innerHTML = 'Page ' + currentPage + ' of ' + (total || 1) + ' &nbsp;';
   if (currentPage > 1) {
     var prev = document.createElement('button');
-    prev.className = 'btn-sm';
-    prev.textContent = '< Prev';
+    prev.className = 'btn-sm'; prev.textContent = '< Prev';
     prev.onclick = function() { currentPage--; runSearch(); };
     el.appendChild(prev);
   }
   if (currentPage < total) {
     var nxt = document.createElement('button');
-    nxt.className = 'btn-sm';
-    nxt.textContent = 'Next >';
+    nxt.className = 'btn-sm'; nxt.textContent = 'Next >';
     nxt.style.marginLeft = '6px';
     nxt.onclick = function() { currentPage++; runSearch(); };
     el.appendChild(nxt);
   }
 }
 
-// ── add / ignore leads ────────────────────────────────────────
 function addOne(i) {
-  var l = leads[i];
-  if (!l) return;
-  var p = {
-    fn: l.fn, ln: l.ln, title: l.title, company: l.company,
-    companyLocation: l.companyLocation || '', email: l.email,
-    li: l.li, phone: l.phone || '', stage: 'New',
-    apolloId: l.apolloId || '', research: '', outreachStep: 0
-  };
+  var l = leads[i]; if (!l) return;
+  var p = { fn: l.fn, ln: l.ln, title: l.title, company: l.company,
+    companyLocation: l.companyLocation || '', email: l.email, li: l.li,
+    phone: l.phone || '', stage: 'New', apolloId: l.apolloId || '',
+    research: '', outreachStep: 0 };
   prospects.push(p);
   saveProspectToDB(p);
   leads.splice(i, 1);
@@ -391,43 +328,33 @@ function addOne(i) {
   showToast('Added ' + p.fn + ' ' + p.ln + ' to Prospects');
 }
 
-function ignoreOne(i) {
-  leads.splice(i, 1);
-  renderLeads();
-}
+function ignoreOne(i) { leads.splice(i, 1); renderLeads(); }
 
 function bulkAdd() {
-  var checked = document.querySelectorAll('.lead-cb:checked');
   var indices = [];
-  checked.forEach(function(cb) { indices.push(parseInt(cb.dataset.i)); });
-  indices.sort(function(a, b) { return b - a; });
+  document.querySelectorAll('.lead-cb:checked').forEach(function(cb) { indices.push(parseInt(cb.dataset.i)); });
+  indices.sort(function(a,b) { return b-a; });
   indices.forEach(function(i) {
     var l = leads[i];
-    var p = {
-      fn: l.fn, ln: l.ln, title: l.title, company: l.company,
-      companyLocation: l.companyLocation || '', email: l.email,
-      li: l.li, phone: l.phone || '', stage: 'New',
-      apolloId: l.apolloId || '', research: '', outreachStep: 0
-    };
-    prospects.push(p);
-    saveProspectToDB(p);
-    leads.splice(i, 1);
+    var p = { fn: l.fn, ln: l.ln, title: l.title, company: l.company,
+      companyLocation: l.companyLocation || '', email: l.email, li: l.li,
+      phone: l.phone || '', stage: 'New', apolloId: l.apolloId || '',
+      research: '', outreachStep: 0 };
+    prospects.push(p); saveProspectToDB(p); leads.splice(i, 1);
   });
   renderLeads();
   showToast('Added ' + indices.length + ' prospects');
 }
 
 function bulkIgnore() {
-  var checked = document.querySelectorAll('.lead-cb:checked');
   var indices = [];
-  checked.forEach(function(cb) { indices.push(parseInt(cb.dataset.i)); });
-  indices.sort(function(a, b) { return b - a; });
+  document.querySelectorAll('.lead-cb:checked').forEach(function(cb) { indices.push(parseInt(cb.dataset.i)); });
+  indices.sort(function(a,b) { return b-a; });
   indices.forEach(function(i) { leads.splice(i, 1); });
   renderLeads();
 }
 
-// ── prospects ─────────────────────────────────────────────────
-var STAGES = ['New', 'Researching', 'Messaged', 'Replied', 'Call Scheduled'];
+var STAGES = ['New','Researching','Messaged','Replied','Call Scheduled'];
 
 function renderProspects() {
   var wrap = document.getElementById('prospect-cards');
@@ -451,7 +378,7 @@ function renderProspects() {
       '<div class="card-company">' + p.company + (p.companyLocation ? ' &bull; ' + p.companyLocation : '') + '</div></div>' +
       '<div class="card-body">' +
       '<select class="stage-select" onchange="setStage(' + i + ',this.value)">' + stageOpts + '</select>' +
-      (p.research ? '<div class="research-snippet">' + p.research.substring(0, 100) + '...</div>' : '') +
+      (p.research ? '<div class="research-snippet">' + p.research.substring(0,100) + '...</div>' : '') +
       '<div class="card-actions">' +
       '<button class="btn-sm" onclick="openResearch(' + i + ')">&#9881; Research</button> ' +
       (p.li ? '<a class="btn-sm" href="' + p.li + '" target="_blank">LinkedIn</a> ' : '') +
@@ -462,117 +389,83 @@ function renderProspects() {
 }
 
 function setStage(i, stage) {
-  var p = prospects[i];
-  if (!p) return;
-  p.stage = stage;
-  updateProspectInDB(p);
-  renderProspects();
+  var p = prospects[i]; if (!p) return;
+  p.stage = stage; updateProspectInDB(p); renderProspects();
 }
 
 function deleteProspect(i) {
-  var p = prospects[i];
-  if (!p) return;
-  deleteProspectFromDB(p.id);
-  prospects.splice(i, 1);
-  renderProspects();
+  var p = prospects[i]; if (!p) return;
+  deleteProspectFromDB(p.id); prospects.splice(i, 1); renderProspects();
 }
 
 function openResearch(i) {
-  var p = prospects[i];
-  if (!p) return;
+  var p = prospects[i]; if (!p) return;
   var panel = document.getElementById('research-panel');
   if (panel) {
     panel.style.display = 'block';
-    document.getElementById('r-name') && (document.getElementById('r-name').textContent = p.fn + ' ' + p.ln + ' — ' + p.company);
-    document.getElementById('r-notes') && (document.getElementById('r-notes').value = p.research || '');
+    if (document.getElementById('r-name')) document.getElementById('r-name').textContent = p.fn + ' ' + p.ln + ' — ' + p.company;
+    if (document.getElementById('r-notes')) document.getElementById('r-notes').value = p.research || '';
     panel.dataset.idx = i;
   }
   showTab('research');
 }
 
 function saveResearch() {
-  var panel = document.getElementById('research-panel');
-  if (!panel) return;
+  var panel = document.getElementById('research-panel'); if (!panel) return;
   var i = parseInt(panel.dataset.idx);
-  var p = prospects[i];
-  if (!p) return;
+  var p = prospects[i]; if (!p) return;
   p.research = document.getElementById('r-notes') ? document.getElementById('r-notes').value : '';
-  updateProspectInDB(p);
-  showToast('Research saved');
+  updateProspectInDB(p); showToast('Research saved');
 }
 
-// ── AI research ───────────────────────────────────────────────
 function runAIResearch() {
-  var panel = document.getElementById('research-panel');
-  if (!panel) return;
+  var panel = document.getElementById('research-panel'); if (!panel) return;
   var i = parseInt(panel.dataset.idx);
-  var p = prospects[i];
-  if (!p) return;
-
+  var p = prospects[i]; if (!p) return;
   var anthropicKey = document.getElementById('s-anthropic') ? document.getElementById('s-anthropic').value : '';
   if (!anthropicKey) { alert('Add your Anthropic API key in Settings.'); return; }
-
   var btn = document.getElementById('run-research-btn');
   if (btn) btn.textContent = 'Researching...';
-
-  var prompt = 'Research this sales prospect and write a friendly LinkedIn connection request message following the 4-step outreach rule (connect first, no pitch).\n\nProspect:\nName: ' + p.fn + ' ' + p.ln + '\nTitle: ' + p.title + '\nCompany: ' + p.company + '\nLocation: ' + (p.companyLocation || 'unknown') + '\n\nProvide:\n1. 3-4 key research insights about this person/company\n2. A short friendly LinkedIn connection request (under 300 chars, no pitch, just genuine interest)\n3. A follow-up thank you message for after they accept';
-
+  var prompt = 'Research this sales prospect and write outreach messages following the 4-step LinkedIn rule:\n1. Connect (no pitch, friendly)\n2. Thank you after connecting\n3. Start a conversation\n4. Introduce what you do\n\nProspect:\nName: ' + p.fn + ' ' + p.ln + '\nTitle: ' + p.title + '\nCompany: ' + p.company + '\nLocation: ' + (p.companyLocation || 'unknown') + '\n\nProvide:\n1. 3-4 key research insights\n2. Step 1 LinkedIn connection request (under 300 chars, no pitch)\n3. Step 2 thank you message\n4. Step 3 conversation starter\n5. Step 4 intro to what Workplace IT does (managed IT services)';
   fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
-      'x-api-key': anthropicKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-direct-browser-access': 'true'
+      'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01',
+      'content-type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true'
     },
-    body: JSON.stringify({
-      model: 'claude-opus-4-5',
-      max_tokens: 1000,
-      messages: [{ role: 'user', content: prompt }]
-    })
+    body: JSON.stringify({ model: 'claude-opus-4-5', max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }] })
   }).then(function(r) { return r.json(); }).then(function(d) {
     var txt = d.content && d.content[0] ? d.content[0].text : 'No response';
-    var notes = document.getElementById('r-notes');
-    if (notes) notes.value = txt;
-    p.research = txt;
-    updateProspectInDB(p);
+    if (document.getElementById('r-notes')) document.getElementById('r-notes').value = txt;
+    p.research = txt; updateProspectInDB(p);
     if (btn) btn.textContent = '&#9889; Run AI Research';
   }).catch(function(e) {
-    alert('AI research error: ' + e.message);
+    alert('AI error: ' + e.message);
     if (btn) btn.textContent = '&#9889; Run AI Research';
   });
 }
 
-// ── settings ──────────────────────────────────────────────────
 function saveSettings() {
   var ak = document.getElementById('s-apollo') ? document.getElementById('s-apollo').value.trim() : '';
   var anth = document.getElementById('s-anthropic') ? document.getElementById('s-anthropic').value.trim() : '';
   if (ak) { apolloKey = ak; saveSettingToDB('apolloKey', ak); }
   if (anth) saveSettingToDB('anthropicKey', anth);
-  showToast('Settings saved to database');
+  showToast('Settings saved');
   loadApolloLists();
 }
 
-// ── toast ─────────────────────────────────────────────────────
 function showToast(msg) {
-  var t = document.getElementById('toast');
-  if (!t) return;
-  t.textContent = msg;
-  t.style.opacity = '1';
+  var t = document.getElementById('toast'); if (!t) return;
+  t.textContent = msg; t.style.opacity = '1';
   setTimeout(function() { t.style.opacity = '0'; }, 3000);
 }
 
-// ── seniority toggle ──────────────────────────────────────────
-function toggleSeniority(btn) {
-  btn.classList.toggle('active');
-}
+function toggleSeniority(btn) { btn.classList.toggle('active'); }
 
-// ── init ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
   initTitles();
   showTab('leads');
+  loadSettingsFromDB().then(function() { loadApolloLists(); });
   loadProspectsFromDB();
-  loadSettingsFromDB().then(function() {
-    loadApolloLists();
-  });
 });
