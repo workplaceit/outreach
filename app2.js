@@ -1,3 +1,116 @@
+
+// ============================================================
+// SUPABASE PERSISTENCE LAYER
+// ============================================================
+var SUPA_URL = 'https://hzpbytknlpeuaamysjbl.supabase.co';
+var SUPA_KEY = 'sb_publishable_sL4HXypL0G1WncdDaWoiTg_Z3tXv7y0';
+
+function supaFetch(path, method, body) {
+  return fetch(SUPA_URL + '/rest/v1/' + path, {
+    method: method || 'GET',
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'return=representation' : ''
+    },
+    body: body ? JSON.stringify(body) : undefined
+  }).then(function(r){ return r.json(); });
+}
+
+// Load all prospects from Supabase
+function loadProspectsFromDB() {
+  return supaFetch('prospects?order=created_at.desc').then(function(rows) {
+    if (!Array.isArray(rows)) return;
+    prospects = rows.map(function(r) {
+      return {
+        id: r.id,
+        fn: r.first_name || '',
+        ln: r.last_name || '',
+        title: r.title || '',
+        company: r.company || '',
+        companyLocation: r.company_location || '',
+        email: r.email || '',
+        li: r.linkedin_url || '',
+        phone: r.phone || '',
+        stage: r.stage || 'New',
+        apolloId: r.apollo_id || '',
+        research: r.research_notes || '',
+        outreachStep: r.outreach_step || 0
+      };
+    });
+    renderProspects();
+  }).catch(function(e){ console.error('DB load error', e); });
+}
+
+// Save a new prospect to Supabase
+function saveProspectToDB(p) {
+  return supaFetch('prospects', 'POST', {
+    first_name: p.fn,
+    last_name: p.ln,
+    title: p.title,
+    company: p.company,
+    company_location: p.companyLocation || '',
+    email: p.email,
+    linkedin_url: p.li,
+    phone: p.phone || '',
+    stage: p.stage || 'New',
+    apollo_id: p.apolloId || '',
+    research_notes: p.research || '',
+    outreach_step: p.outreachStep || 0
+  }).then(function(rows) {
+    if (Array.isArray(rows) && rows[0]) {
+      p.id = rows[0].id; // store DB id on the prospect
+    }
+  }).catch(function(e){ console.error('DB save error', e); });
+}
+
+// Update a prospect in Supabase
+function updateProspectInDB(p) {
+  if (!p.id) return saveProspectToDB(p);
+  return supaFetch('prospects?id=eq.' + p.id, 'PATCH', {
+    first_name: p.fn,
+    last_name: p.ln,
+    title: p.title,
+    company: p.company,
+    company_location: p.companyLocation || '',
+    email: p.email,
+    linkedin_url: p.li,
+    phone: p.phone || '',
+    stage: p.stage || 'New',
+    research_notes: p.research || '',
+    outreach_step: p.outreachStep || 0
+  }).catch(function(e){ console.error('DB update error', e); });
+}
+
+// Delete a prospect from Supabase
+function deleteProspectFromDB(id) {
+  if (!id) return;
+  return supaFetch('prospects?id=eq.' + id, 'DELETE').catch(function(e){ console.error('DB delete error', e); });
+}
+
+// Save settings key/value
+function saveSettingToDB(key, value) {
+  return supaFetch('settings', 'POST', { key: key, value: value })
+    .catch(function(){
+      return supaFetch('settings?key=eq.' + key, 'PATCH', { value: value });
+    });
+}
+
+// Load all settings
+function loadSettingsFromDB() {
+  return supaFetch('settings').then(function(rows) {
+    if (!Array.isArray(rows)) return;
+    rows.forEach(function(r) {
+      if (r.key === 'apolloKey') document.getElementById('s-apollo') && (document.getElementById('s-apollo').value = r.value);
+      if (r.key === 'anthropicKey') document.getElementById('s-anthropic') && (document.getElementById('s-anthropic').value = r.value);
+    });
+  }).catch(function(e){ console.error('Settings load error', e); });
+}
+
+// ============================================================
+// END SUPABASE LAYER
+// ============================================================
 var PROXY="https://apollo-proxy.jason-939.workers.dev";
 var APOLLO_KEY="4j1OoTcIhPejsI-YMmnaqA";
 var COLORS=["#29abe2","#0ea5e9","#0d9488","#7c3aed","#db2777","#ea580c"];
@@ -8,7 +121,7 @@ var listModality={};
 
 function gc(i){return COLORS[i%COLORS.length];}
 
-// ── TAG INPUT ─────────────────────────────────────────────────────
+// ââ TAG INPUT âââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function renderTitleTags(){
   var w=document.getElementById("titles-tags");
   if(!w)return;
@@ -41,7 +154,7 @@ function initTitles(){
   inp.addEventListener("blur",function(){box.style.borderColor="";});
 }
 
-// ── LOAD LISTS ────────────────────────────────────────────────────
+// ââ LOAD LISTS ââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function loadApolloLists(){
   var s=document.getElementById("f-list");
   if(!s)return;
@@ -49,7 +162,7 @@ async function loadApolloLists(){
     var res=await fetch(PROXY+"/apollo/labels",{headers:{"X-Apollo-Key":APOLLO_KEY}});
     var data=await res.json();
     var arr=Array.isArray(data)?data:Object.values(data);
-    s.innerHTML='<option value="">— No list filter —</option>';
+    s.innerHTML='<option value="">â No list filter â</option>';
     arr.forEach(function(l){
       listModality[l._id]=l.modality;
       var opt=document.createElement("option");
@@ -63,14 +176,14 @@ async function loadApolloLists(){
   }
 }
 
-// ── LIST SELECTION HANDLER ────────────────────────────────────────
+// ââ LIST SELECTION HANDLER ââââââââââââââââââââââââââââââââââââââââ
 async function loadListAccounts(){
   var listId=document.getElementById("f-list").value;
   var panel=document.getElementById("accounts-panel");
   var tableWrap=document.getElementById("leads-table-wrap");
   var toolbar=document.getElementById("leads-toolbar");
 
-  // No list selected — reset to normal view
+  // No list selected â reset to normal view
   if(!listId){
     panel.style.display="none";
     tableWrap.style.display="";
@@ -81,7 +194,7 @@ async function loadListAccounts(){
 
   var modality=listModality[listId]||"contacts";
 
-  // People list — load contacts directly, no credits
+  // People list â load contacts directly, no credits
   if(modality==="contacts"){
     panel.style.display="none";
     tableWrap.style.display="";
@@ -90,10 +203,10 @@ async function loadListAccounts(){
     return;
   }
 
-  // Account/company list — show companies free, offer to search contacts
+  // Account/company list â show companies free, offer to search contacts
   var pp=parseInt(document.getElementById("f-perpage").value)||50;
   panel.style.display="";
-  panel.innerHTML='<div class="loading-bar"><div class="spinner"></div>Loading companies from list — no credits used...</div>';
+  panel.innerHTML='<div class="loading-bar"><div class="spinner"></div>Loading companies from list â no credits used...</div>';
   tableWrap.style.display="none";
   toolbar.style.display="none";
   document.getElementById("leads-error").innerHTML="";
@@ -122,14 +235,14 @@ async function loadListAccounts(){
 
     accounts.forEach(function(a){
       var loc=[a.city,a.state,a.country].filter(Boolean).join(", ");
-      var size=a.estimated_num_employees?a.estimated_num_employees.toLocaleString()+" emp":"—";
-      var li=a.linkedin_url?'<a href="'+a.linkedin_url+'" target="_blank" style="color:var(--cyan)">View ↗</a>':"—";
+      var size=a.estimated_num_employees?a.estimated_num_employees.toLocaleString()+" emp":"â";
+      var li=a.linkedin_url?'<a href="'+a.linkedin_url+'" target="_blank" style="color:var(--cyan)">View â</a>':"â";
       html+="<tr>"
         +'<td><a href="'+(a.website_url||"#")+'" target="_blank" style="color:var(--cyan);font-weight:600">'+a.name+"</a></td>"
-        +'<td style="font-size:12px">'+(a.industry||"—")+"</td>"
+        +'<td style="font-size:12px">'+(a.industry||"â")+"</td>"
         +"<td>"+size+"</td>"
-        +"<td>"+(loc||"—")+"</td>"
-        +'<td style="font-size:12px">'+(a.phone||"—")+"</td>"
+        +"<td>"+(loc||"â")+"</td>"
+        +'<td style="font-size:12px">'+(a.phone||"â")+"</td>"
         +"<td>"+li+"</td>"
         +"</tr>";
     });
@@ -143,20 +256,20 @@ async function loadListAccounts(){
       html+="</div>";
     }
     panel.innerHTML=html;
-    toast("Loaded "+accounts.length+" companies — no credits used");
+    toast("Loaded "+accounts.length+" companies â no credits used");
   }catch(e){
     panel.innerHTML='<div class="error-box">Error: '+e.message+"</div>";
   }
 }
 
-// ── LOAD PEOPLE LIST (no credits) ────────────────────────────────
+// ââ LOAD PEOPLE LIST (no credits) ââââââââââââââââââââââââââââââââ
 async function loadPeopleList(listId){
   var pp=parseInt(document.getElementById("f-perpage").value)||50;
   var tbody=document.getElementById("leads-tbody");
   document.getElementById("leads-shown").textContent="0";
   document.getElementById("leads-total").textContent="0";
   document.getElementById("leads-error").innerHTML="";
-  tbody.innerHTML='<tr><td colspan="8"><div class="loading-bar"><div class="spinner"></div>Loading saved contacts — no credits used...</div></td></tr>';
+  tbody.innerHTML='<tr><td colspan="8"><div class="loading-bar"><div class="spinner"></div>Loading saved contacts â no credits used...</div></td></tr>';
 
   try{
     var res=await fetch(PROXY+"/apollo/contacts/search",{
@@ -189,14 +302,14 @@ async function loadPeopleList(listId){
     totalLeads=data.pagination?data.pagination.total_entries:leads.length;
     renderLeads();
     renderPagination(data.pagination,pp);
-    toast("Loaded "+leads.length+" contacts — no credits used");
+    toast("Loaded "+leads.length+" contacts â no credits used");
   }catch(e){
     document.getElementById("leads-error").innerHTML='<div class="error-box">Error: '+e.message+"</div>";
     tbody.innerHTML="";
   }
 }
 
-// ── SEARCH CONTACTS IN ACCOUNT LIST (uses credits) ────────────────
+// ââ SEARCH CONTACTS IN ACCOUNT LIST (uses credits) ââââââââââââââââ
 async function searchContactsInAccounts(){
   if(!listAccountIds.length){toast("No companies loaded");return;}
   document.getElementById("accounts-panel").style.display="none";
@@ -206,7 +319,7 @@ async function searchContactsInAccounts(){
   await runSearch(1,listAccountIds);
 }
 
-// ── PEOPLE SEARCH ─────────────────────────────────────────────────
+// ââ PEOPLE SEARCH âââââââââââââââââââââââââââââââââââââââââââââââââ
 async function runSearch(page,accountIds){
   curPage=page||1;
   document.getElementById("accounts-panel").style.display="none";
@@ -283,7 +396,7 @@ function renderPagination(pag,pp){
   document.getElementById("pagination").innerHTML=h;
 }
 
-// ── RENDER LEADS TABLE ────────────────────────────────────────────
+// ââ RENDER LEADS TABLE ââââââââââââââââââââââââââââââââââââââââââââ
 function renderLeads(){
   var tb=document.getElementById("leads-tbody");
   if(!leads.length){
@@ -295,7 +408,7 @@ function renderLeads(){
     var l=leads[i];
     var chk='<input type="checkbox" '+(sel.has(l.id)?"checked ":"")+'onchange="toggleL(\''+l.id+'\',this.checked)"/>';
     var av='<div class="avatar" style="background:'+gc(i)+'">'+l.av+"</div>";
-    var li=l.li?'<a href="'+l.li+'" target="_blank" style="color:var(--cyan);font-size:12px">View ↗</a>':"—";
+    var li=l.li?'<a href="'+l.li+'" target="_blank" style="color:var(--cyan);font-size:12px">View â</a>':"â";
     var eb=l.email
       ?'<span style="display:inline-flex;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;background:#dcfce7;color:#15803d">'+l.email+"</span>"
       :'<span style="display:inline-flex;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;background:#fef9c3;color:#854d0e">Not available</span>';
@@ -303,9 +416,9 @@ function renderLeads(){
     var ib='<div class="icon-btn ign" onclick="ignOne(\''+l.id+'\')" title="Ignore"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-width="2"/></svg></div>';
     rows+="<tr><td>"+chk+"</td>"
       +'<td><div class="lead-name-cell">'+av+'<div><div class="lead-name">'+l.name+'</div><div class="lead-sub">'+l.title+"</div></div></div></td>"
-      +"<td>"+(l.company||"—")+"</td>"
-      +'<td style="font-size:12px">'+(l.coLocation||"—")+"</td>"
-      +'<td style="font-size:12px">'+(l.size||"—")+"</td>"
+      +"<td>"+(l.company||"â")+"</td>"
+      +'<td style="font-size:12px">'+(l.coLocation||"â")+"</td>"
+      +'<td style="font-size:12px">'+(l.size||"â")+"</td>"
       +"<td>"+li+"</td>"
       +"<td>"+eb+"</td>"
       +"<td><div class='action-btns'>"+ab+ib+"</div></td></tr>";
@@ -332,7 +445,7 @@ function ignOne(id){leads.splice(leads.findIndex(function(l){return l.id===id;})
 function bulkIgnore(){sel.forEach(function(id){leads.splice(leads.findIndex(function(l){return l.id===id;}),1);});sel.clear();renderLeads();}
 function filterTable(q){document.querySelectorAll("#leads-tbody tr").forEach(function(r){r.style.display=r.textContent.toLowerCase().includes(q.toLowerCase())?"":"none";});}
 
-// ── PROSPECTS ─────────────────────────────────────────────────────
+// ââ PROSPECTS âââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function renderProspects(filter){
   var g=document.getElementById("prospect-grid");
   var list=filter?prospects.filter(function(p){return sName(p.stage)===filter;}):prospects;
@@ -367,13 +480,13 @@ function nextStage(id){var p=prospects.find(function(x){return x.id===id;});var 
 function goR(id){showPage("research");setTimeout(function(){selectR(id);},50);}
 function goO(id){showPage("outreach");setTimeout(function(){selectO(id);},50);}
 
-// ── RESEARCH ──────────────────────────────────────────────────────
+// ââ RESEARCH ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function renderRL(){
   var html="";
   prospects.forEach(function(p,i){
     html+='<div class="r-item '+(activeR===p.id?"active":"")+'" onclick="selectR(\''+p.id+'\')">'
       +'<div class="avatar" style="background:'+gc(i)+';width:34px;height:34px;font-size:12px;flex-shrink:0">'+p.av+"</div>"
-      +'<div><div class="r-item-name">'+p.name+(p.aiS?" ✓":"")+"</div><div class='r-item-co'>"+p.company+"</div></div></div>";
+      +'<div><div class="r-item-name">'+p.name+(p.aiS?" â":"")+"</div><div class='r-item-co'>"+p.company+"</div></div></div>";
   });
   document.getElementById("r-list-items").innerHTML=html;
 }
@@ -397,18 +510,18 @@ function runR(id){
     var first=p.name.split(" ")[0];
     var loc=p.coLocation||p.location||"the Denver area";
     var co=p.company;
-    p.aiS=co+" is in your target area. "+p.name+" is a decision-maker — use the 4-step sequence to build rapport before introducing Workplace IT.";
+    p.aiS=co+" is in your target area. "+p.name+" is a decision-maker â use the 4-step sequence to build rapport before introducing Workplace IT.";
     p.insights=[
-      {t:"Never pitch on the connection request — just connect"},
+      {t:"Never pitch on the connection request â just connect"},
       {t:"Thank them first, then start a real conversation"},
       {t:"Introduce what you do only after rapport is established"},
       {t:p.email?"Email also available for follow-up: "+p.email:"LinkedIn is the primary channel"}
     ];
     // 4-step messages
-    p.msg1="Hi "+first+", I work with businesses in "+loc+" and came across your profile — would love to connect!";
+    p.msg1="Hi "+first+", I work with businesses in "+loc+" and came across your profile â would love to connect!";
     p.msg2="Thanks for connecting, "+first+"! Really appreciate it. Hope things are going well at "+co+".";
-    p.msg3="Hey "+first+", I'm curious — what's been the biggest challenge on the IT or operations side at "+co+" lately? Always trying to understand what local businesses are dealing with.";
-    p.msg4="Thanks for sharing that, "+first+". We actually help companies in "+loc+" take IT completely off their plate — 24/7 monitoring, local team, no surprises. Might be worth a quick 15-min chat to see if there's a fit. Would that be useful?";
+    p.msg3="Hey "+first+", I'm curious â what's been the biggest challenge on the IT or operations side at "+co+" lately? Always trying to understand what local businesses are dealing with.";
+    p.msg4="Thanks for sharing that, "+first+". We actually help companies in "+loc+" take IT completely off their plate â 24/7 monitoring, local team, no surprises. Might be worth a quick 15-min chat to see if there's a fit. Would that be useful?";
     // default msg for outreach tab (step 1)
     p.msg=p.msg1;
     p.msgStep=1;
@@ -443,7 +556,7 @@ function runAllResearch(){
 }
 function regenR(id){var p=prospects.find(function(x){return x.id===id;});p.aiS=null;selectR(id);setTimeout(function(){runR(id);},100);}
 
-// ── OUTREACH ──────────────────────────────────────────────────────
+// ââ OUTREACH ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function renderOutreach(){
   var html="";
   prospects.forEach(function(p,i){
@@ -485,7 +598,7 @@ function updCC(id){var ta=document.getElementById("msg-"+id);var cc=document.get
 function sendO(id,mode){var p=prospects.find(function(x){return x.id===id;});p.stage="messaged";if(mode==="linkedin"&&p.li)window.open(p.li,"_blank");renderProspects();renderOutreach();updateStats();toast(mode==="linkedin"?"Opening LinkedIn for "+p.name+"...":"Email queued for "+p.name);}
 function regenO(id){var p=prospects.find(function(x){return x.id===id;});p.msg="Hi "+p.name.split(" ")[0]+", saw your team is growing at "+p.company+". We keep IT off your plate - 24/7, no surprises. Worth a quick call?";selectO(id);}
 
-// ── UTILS ─────────────────────────────────────────────────────────
+// ââ UTILS âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function updateStats(){
   document.getElementById("stat-leads").textContent=leads.length+prospects.length;
   document.getElementById("stat-prospects").textContent=prospects.length;
@@ -508,3 +621,6 @@ function toast(msg){var t=document.getElementById("toast");t.textContent=msg;t.c
 
 initTitles();
 loadApolloLists();
+
+// Auto-init DB on load
+if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", function(){ loadProspectsFromDB(); loadSettingsFromDB(); }); } else { loadProspectsFromDB(); loadSettingsFromDB(); }
